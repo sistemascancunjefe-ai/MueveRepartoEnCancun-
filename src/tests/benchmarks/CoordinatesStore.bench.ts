@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest';
+import { bench, describe, beforeAll } from 'vitest';
 import { CoordinatesStore } from '../../utils/CoordinatesStore';
 
 // Generate 5000 random points in a 10x10 degree area (approx 1100km x 1100km)
