@@ -43,7 +43,6 @@ const { center = [21.1619, -86.8515], zoom = 13 } = Astro.props;
   let map;
   let layerGroup;
   let coordinatesDB = {};
-  let leafletPromise = null;
 
 
   async function initMap() {
