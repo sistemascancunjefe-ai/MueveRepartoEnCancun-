@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getWalletBalance, setWalletBalance, initDB, updateWalletBalance } from '../utils/db';
-import { openDB } from 'idb';
 
 // Mock the idb library
 vi.mock('idb', () => {
