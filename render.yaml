@@ -1,22 +1,21 @@
-services:
-  - type: web
-<<<<<<< HEAD
-    name: muevecancun
-    env: static
-    buildCommand: "./scripts/build_render.sh"
-    staticPublishPath: ./dist
-    branch: main
-=======
-    name: cancunmueve-pwa
-    runtime: node
-    buildCommand: pnpm run build
-    # Fallback to serving static files if running as a Web Service
-    startCommand: npx serve -s dist
-    # Explicitly set static publish path for Static Site services
-    staticPublishPath: ./dist
->>>>>>> security/ffi-hardening-2939308447874549092
-    envVars:
+# Exported from Render on 2026-02-18T03:54:09Z
+version: "1"
+projects:
+- name: QUINTANAROO_CREATIONS
+  environments:
+  - name: CANCUNMUEVE
+    services:
+    - type: web
+      name: QueRutaMeLLevaCancun
+      runtime: static
+      repo: https://github.com/JULIANJUAREZMX01/MueveCancun
+      envVars:
       - key: NODE_VERSION
-        value: 20
+        sync: false
       - key: ENABLE_PNPM
-        value: 1
+        sync: false
+      buildCommand: export RUSTUP_HOME=$HOME/.rustup CARGO_HOME=$HOME/.cargo && curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && source $HOME/.cargo/env && rustup target add wasm32-unknown-unknown && curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf -o install_wasm.sh && sh install_wasm.sh && pnpm install && pnpm run build
+      staticPublishPath: dist
+      autoDeployTrigger: checksPass
+      previews:
+        generation: automatic

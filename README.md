@@ -1,78 +1,153 @@
-# MueveCancun: La Verdad de la Calle 🌴🚍
+# 🏛️ MueveCancun: La Verdad de la Calle (Nexus Prime v3.2)
 
 > "MueveCancun no nació en una oficina, nació en la parada del camión."
 
 ## 📍 El Problema: Google Maps no entiende a Cancún
 
-En nuestra ciudad, el transporte público es un organismo vivo que cambia más rápido que los algoritmos de las grandes plataformas. Un aviso en Facebook, un bloqueo repentino o una nueva ruta informal son la **"verdad de la calle"** que Google Maps ignora. Por eso, lo que necesitas no es un mapa global; necesitas una herramienta local que entienda el caos y lo ordene para ti.
+En nuestra ciudad, el transporte público es un organismo vivo que cambia más rápido que los algoritmos de las grandes plataformas. Un aviso en Facebook, un bloqueo repentino o una nueva ruta informal son la **"verdad de la calle"** que Google Maps ignora.
 
-MueveCancun es simple: **Funciona sin internet**, es ultrarrápida y está diseñada para que cualquier persona, bajo el sol del Caribe, sepa exactamente qué ruta la lleva a su destino.
-
-## ⚙️ La Estructura: El Protocolo Nexus
-
-Detrás de esa simplicidad hay una arquitectura de alto rendimiento dividida en 4 capas esenciales:
-
-### 1. Capa de Infraestructura (Render)
-Gestionada por `render.yaml` y `scripts/build_render.sh`. Despliega el sitio estático en la red global de Render.
-
-### 2. Capa de Motor (Rust/WASM)
-El corazón del sistema. Ubicado en `rust-wasm/route-calculator`.
-- **Lógica**: Algoritmo Dijkstra optimizado para transferencias.
-- **Rendimiento**: Calcula miles de rutas en <100ms.
-- **Compilación**: Genera binarios WASM que se ejecutan localmente en tu navegador.
-
-### 3. Capa de Inteligencia (Listener)
-El cerebro de datos.
-- **Actual**: `scripts/sync-routes.mjs` sincroniza `src/data/routes.json` con `public/data/master_routes.json`.
-- **Futuro**: `scripts/listener/` (Pendiente) integrará scrapers de redes sociales y tráfico en tiempo real.
-
-### 4. Capa Frontend (Astro)
-La interfaz de usuario ultraligera.
-- **Framework**: Astro 5 + Vanilla JS.
-- **Estilos**: CSS Puro (Sin Frameworks pesados).
-- **Mapas**: Leaflet.js + OpenStreetMap.
-
-## 🛠️ Stack Tecnológico
-
-- **Frontend**: Astro + Vanilla JS/TS.
-- **Estilos**: Vanilla CSS + Variables CSS5.
-- **Motor**: Rust (WASM) + wasm-pack.
-- **Persistencia**: IndexedDB + LocalStorage.
-- **Gestor de Paquetes**: pnpm (Requerido).
-
-## 👤 Detrás del Proyecto
-
-**Julián Alexander Juárez Alvarado**  
-_Full Stack Data Engineer y Analista de Seguridad._
-
-Mi carrera se define por una obsesión: la eficiencia. MueveCancun es mi laboratorio de pruebas donde aplico la experiencia adquirida en entornos de alta demanda para resolver problemas sociales reales.
+MueveCancun es simple: **Funciona sin internet**, es ultrarrápida y está diseñada para que cualquier persona sepa exactamente qué ruta la lleva a su destino.
 
 ---
 
-## 📦 Estructura del Proyecto
+## 🏛️ La Arquitectura: El Protocolo Nexus (4 Capas)
 
-- `rust-wasm/`: Código fuente del motor en Rust.
-- `src/`: Componentes Astro y lógica Frontend.
-- `public/data/`: JSONs de rutas (Generados por el Listener).
-- `scripts/`: Utilidades de construcción y sincronización.
+Esta arquitectura de alto rendimiento está dividida en 4 sistemas secuenciales que trabajan en conjunto para ofrecer una aplicación offline-first ultrarrápida.
 
-## 🛠️ Desarrollo
+### 1. Capa de Datos: Origen de Rutas
+- **Función**: Catálogo base que contiene "Señales Sociales" (alertas de tráfico, bloqueos, avisos de madrugada) y la información de todas las rutas.
+- **Ubicación**: `public/data/master_routes.json` con estructura validada para el motor WASM.
+
+**Esquema JSON de master_routes.json:**
+```json
+{
+  "metadata": {
+    "last_updated": "ISO 8601 timestamp",
+    "source": "Nexus Listener v1.0",
+    "version": "3.2.0"
+  },
+  "social_alerts": ["Alerta global 1", "Alerta global 2"],
+  "routes": [
+    {
+      "id": "R2_94_VILLAS_OTOCH_001",
+      "nombre": "R-2-94 Villas Otoch (Eje Kabah - ZH)",
+      "tarifa": 15,
+      "moneda": "MXN",
+      "hub_conexion": "Plaza Las Américas / Chedraui Lakin",
+      "frecuencia_minutos": 10,
+      "horario": {
+        "inicio_oficial": "05:00",
+        "fin_oficial": "22:30",
+        "guardia_nocturna": "03:00 - 05:00"
+      },
+      "social_alerts": ["Aviso de madrugada", "Información de campo"],
+      "paradas": [
+        {
+          "nombre": "OXXO Villas Otoch",
+          "lat": 21.1685,
+          "lng": -86.885,
+          "orden": 1,
+          "tipo": "origen_madrugada",
+          "horario_salida_primer_turno": "03:55",
+          "advertencia": "Punto de agrupación"
+        }
+      ],
+      "tipo": "Bus_Urbano_Isla"
+    }
+  ]
+}
+```
+
+**Señales Sociales**: El sistema captura información de campo que Google Maps no ofrece: tarifas de madrugada, puntos de Guardia Nocturna, advertencias de letreros obligatorios, y estados actuales del tráfico.
+
+### 2. Capa de Procesamiento: Motor Rust/WASM
+- **Core**: `rust-wasm/route-calculator/src/lib.rs`
+- **Compilación**: `scripts/build-wasm.mjs` (usa wasm-pack + binaryen para optimización).
+- **SpatialHash**: Estructura de índice espacial para búsquedas O(1) de rutas cercanas.
+- **RouteCalculator**: Algoritmo que encuentra la mejor ruta considerando distancia, frecuencia y transbordos.
+- **Ruta Crítica**: El binario WASM se sirve desde `/wasm/route-calculator/route_calculator.js`.
+- **Seguridad**: Hardening contra DoS con Circuit Breaker de 2M ops máximo por request.
+
+### 3. Capa de Presentación: Astro SSG
+- **UI**: Componentes `.astro` sin framework JS pesado (Vanilla JS para interactividad).
+- **Estilos**: `src/styles/global.css` y `src/index.css` con CSS Variables + Grid + Flexbox.
+- **Diseño Responsive**: Optimizado para Dark/Light mode y navegación inferior fija (mobile-first).
+- **PWA Offline**: Service Worker para funcionamiento sin conexión.
+- **defaultLang**: 'es' (español) como idioma predeterminado.
+
+### 4. Capa de Persistencia: IndexedDB
+- **db.ts**: Gestiona el balance de usuario en IndexedDB (migración automática desde localStorage).
+- **Stores en src/lib/**:
+  - `SpatialHash.ts`: Índice espacial para rutas
+  - `FavoritesStore.ts`: Rutas favoritas persistidas
+  - `CoordinatesStore.ts`: Coordenadas del usuario
+- **Estrategia**: Offline-first con sincronización cuando hay conexión.
+
+---
+
+## 🛠️ Troubleshooting & Interconexión
+
+Si el sistema falla, sigue esta guía de diagnóstico por capas (Protocolo Nexus):
+
+### 🔴 Capa 1: Error en los Datos Base
+1. **Schema Check**: Confirma que `public/data/master_routes.json` tenga las claves `routes`, `social_alerts` y `metadata`.
+2. **Validar JSON**: Asegúrate de que el archivo no tenga errores de sintaxis.
+
+### 🟡 Capa 2: Error en Motor WASM (Procesamiento)
+1. **Verificar WASM**: Revisa que `public/wasm/route-calculator/route_calculator_bg.wasm` exista y tenga tamaño >0.
+2. **Path Audit**: Confirma que `RouteCalculator.astro` importa desde `/wasm/...`.
+3. **Recompilar**: Ejecuta `node scripts/build-wasm.mjs`.
+4. **Logs del navegador**: Revisa la consola para errores de WebAssembly.
+
+### 🔵 Capa 3: Error en Frontend (Presentación)
+1. **CSS Audit**: Revisa que los componentes usen clases compatibles con Dark Mode (ej. `dark:text-slate-100`).
+2. **Z-Index**: La barra de navegación (`z-50`) no debe cubrir el contenido (`pb-24` en `MainLayout`).
+3. **PWA**: Verifica que el Service Worker esté registrado en `src/pages/_offline.astro`.
+
+### 🟢 Capa 4: Error en IndexedDB (Persistencia)
+1. **Console DB**: Revisa errores en la consola del navegador relacionados con `db.ts`.
+2. **Migración localStorage**: Verifica que la migración automática desde localStorage funcione.
+3. **Storage quota**: Asegúrate de que el navegador tenga espacio disponible para IndexedDB.
+
+### ⚡ Comandos de Diagnóstico Rápido
+```bash
+# Verificar estructura de datos
+python3 -c "import json; print(json.load(open('public/data/master_routes.json')).keys())"
+
+# Verificar compilación WASM
+ls -la public/wasm/route-calculator/
+
+# Verificar stores de persistencia
+ls -la src/lib/
+```
+
+---
+
+## 📦 Comandos de Desarrollo
 
 1. **Instalar dependencias**:
    ```bash
    pnpm install
    ```
 
-2. **Compilar Motor WASM**:
+2. **Datos Maestros**:
+   Los datos se encuentran en `public/data/master_routes.json` y se pueden modificar directamente.
+
+3. **Compilar Motor WASM**:
    ```bash
-   pnpm run build:wasm
+   node scripts/build-wasm.mjs
    ```
 
-3. **Iniciar Servidor de Desarrollo**:
+4. **Iniciar Servidor Local**:
    ```bash
    pnpm run dev
    ```
 
 ---
 
-_Desarrollado con ❤️ para los viajeros de Cancún._
+## 👤 Créditos
+
+**Julián Alexander Juárez Alvarado**
+_Lead Architect & Full Stack Data Engineer_
+
+> "La eficiencia no es un lujo técnico, es un imperativo moral."
