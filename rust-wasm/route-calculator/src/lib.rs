@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
-use strsim;
+
 use wasm_bindgen::prelude::*; // Sentinel: Added for safe comparison
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -34,6 +34,8 @@ pub struct Route {
     // Computed fields for internal use
     #[serde(skip)]
     pub stops_normalized: Vec<String>,
+    #[serde(skip)]
+    pub stop_name_to_index: HashMap<String, usize>,
 
     #[serde(default, alias = "advertencias_usuario")]
     pub social_alerts: Vec<String>,
@@ -167,6 +169,12 @@ pub fn load_catalog_core(json_payload: &str) -> Result<(), String> {
     // Pre-compute normalized stops for fuzzy matching
     for route in &mut catalog.rutas {
         route.stops_normalized = route.stops.iter().map(|s| s.name.to_lowercase()).collect();
+        route.stop_name_to_index = route
+            .stops_normalized
+            .iter()
+            .enumerate()
+            .map(|(idx, name)| (name.clone(), idx))
+            .collect();
     }
 
     let mut map = HashMap::new();
@@ -408,19 +416,6 @@ fn find_route_rs(origin: &str, dest: &str, all_routes: &Vec<Route>) -> Vec<Journ
         .filter(|m| m.dest_idx.is_some())
         .collect();
 
-    // OPTIMIZATION: Hoist HashMap creation out of the nested loop
-    // Reduces allocations from N*M to M
-    let dest_route_maps: Vec<HashMap<&str, usize>> = routes_to_dest
-        .iter()
-        .map(|m| {
-            let mut map = HashMap::with_capacity(m.route.stops_normalized.len());
-            for (idx, stop_name) in m.route.stops_normalized.iter().enumerate() {
-                map.insert(stop_name.as_str(), idx);
-            }
-            map
-        })
-        .collect();
-
     let preferred_hubs = [
         "El Crucero",
         "Plaza Las Américas",
@@ -447,7 +442,7 @@ fn find_route_rs(origin: &str, dest: &str, all_routes: &Vec<Route>) -> Vec<Journ
             None => continue,
         };
 
-        for (b_idx, match_b) in routes_to_dest.iter().enumerate() {
+        for match_b in routes_to_dest.iter() {
             if journeys.len() + candidates.len() >= MAX_CANDIDATES {
                 break 'outer;
             }
@@ -462,9 +457,6 @@ fn find_route_rs(origin: &str, dest: &str, all_routes: &Vec<Route>) -> Vec<Journ
                 continue;
             }
 
-            // Use pre-computed map
-            let route_b_stops = &dest_route_maps[b_idx];
-
             let mut best_transfer: Option<(usize, bool)> = None;
 
             for (idx_a, stop_name_a) in route_a.stops_normalized.iter().enumerate() {
@@ -477,7 +469,7 @@ fn find_route_rs(origin: &str, dest: &str, all_routes: &Vec<Route>) -> Vec<Journ
                     continue;
                 }
 
-                if let Some(&idx_b) = route_b_stops.get(stop_name_a.as_str()) {
+                if let Some(&idx_b) = route_b.stop_name_to_index.get(stop_name_a) {
                     if idx_b == dest_idx_b {
                         continue;
                     }
@@ -695,6 +687,7 @@ mod tests {
                     .map(|j| format!("common long prefix stop a {}", j))
                     .collect(),
                 social_alerts: Vec::new(),
+                stop_name_to_index: HashMap::new(),
                 last_updated: String::new(),
             });
         }
@@ -724,6 +717,7 @@ mod tests {
                     .map(|j| format!("common long prefix stop b {}", j))
                     .collect(),
                 social_alerts: Vec::new(),
+                stop_name_to_index: HashMap::new(),
                 last_updated: String::new(),
             });
         }
@@ -774,6 +768,7 @@ mod tests {
                 horario: None,
                 stops: Vec::new(),
                 stops_normalized: Vec::new(),
+                stop_name_to_index: HashMap::new(),
                 social_alerts: Vec::new(),
                 last_updated: String::new(),
             });
@@ -814,6 +809,7 @@ mod tests {
             horario: None,
             stops: stops,
             stops_normalized: Vec::new(),
+            stop_name_to_index: HashMap::new(),
             social_alerts: Vec::new(),
             last_updated: String::new(),
         };
@@ -861,6 +857,11 @@ mod tests {
                     },
                 ],
                 stops_normalized: vec!["start".to_string(), format!("hub_{}", i)],
+                stop_name_to_index: vec!["start".to_string(), format!("hub_{}", i)]
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, name)| (name.clone(), idx))
+                    .collect(),
                 social_alerts: Vec::new(),
                 last_updated: String::new(),
             });
@@ -893,6 +894,11 @@ mod tests {
                     },
                 ],
                 stops_normalized: vec![format!("hub_{}", i), "end".to_string()],
+                stop_name_to_index: vec![format!("hub_{}", i), "end".to_string()]
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, name)| (name.clone(), idx))
+                    .collect(),
                 social_alerts: Vec::new(),
                 last_updated: String::new(),
             });
@@ -903,7 +909,11 @@ mod tests {
         let duration = start.elapsed();
 
         // Ensure performance is acceptable (Debug < 1000ms, Release < 200ms)
-        assert!(duration.as_millis() < 1000, "High volume transfer took too long: {:?}", duration);
+        assert!(
+            duration.as_millis() < 1000,
+            "High volume transfer took too long: {:?}",
+            duration
+        );
         assert!(!res.is_empty());
         assert_eq!(res.len(), 5); // Should be truncated to 5
     }
@@ -939,6 +949,10 @@ mod tests {
         let res = load_catalog_core(&json);
         assert!(res.is_err());
         let err = res.err().unwrap();
-        assert!(err.contains("Validation Error: Route[0] has too many stops"), "Unexpected error: {}", err);
+        assert!(
+            err.contains("Validation Error: Route[0] has too many stops"),
+            "Unexpected error: {}",
+            err
+        );
     }
 }
