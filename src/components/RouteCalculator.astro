@@ -346,10 +346,12 @@ const ui = uiTranslations[currentLang];
 
           let payload = catalogString;
 
-          // Speedy Gonzalez 🐭⚡: Smart Normalization
+          // ⚡ Speedy Gonzalez: Smart Normalization
           // Only normalize if using un-optimized fallback data.
-          if (!jsonData.version && jsonData.metadata?.version) {
-              console.warn("⚠️ Using un-optimized catalog. Client-side normalization active (Slower).");
+          if (jsonData.metadata?.optimized) {
+              console.log("⚡ [RouteCalculator] Using pre-optimized JSON (Skipped Runtime Normalization)");
+          } else {
+              console.warn("⚠️ [RouteCalculator] Data not optimized. Running runtime normalization (Slow).");
               const normalized = { ...jsonData };
 
               // 1. Root Version
@@ -382,8 +384,6 @@ const ui = uiTranslations[currentLang];
                   });
               }
               payload = JSON.stringify(normalized);
-          } else {
-              console.log("⚡ Using optimized catalog (Zero-copy pass to WASM)");
           }
 
           // Sentinel: Enforce 10MB limit
