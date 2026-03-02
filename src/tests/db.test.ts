@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { openDB } from 'idb';
-import { getWalletBalance, setWalletBalance, initDB, updateWalletBalance } from '../utils/db';
+import { getWalletBalance, __resetDBPromise, setWalletBalance, initDB, updateWalletBalance } from '../utils/db';
 
 // Mock the idb library
 vi.mock('idb', () => {
@@ -133,6 +133,7 @@ describe('DB Security Checks', () => {
     // Simulate a fresh profile: no migration done and no localStorage values
     localStorageMock.getItem.mockImplementation((_key) => null);
 
+    __resetDBPromise();
     await initDB();
 
     const balance = await getWalletBalance();
