@@ -3,6 +3,42 @@ import { openDB, type IDBPDatabase } from 'idb';
 const DB_NAME = 'cancunmueve-db';
 const DB_VERSION = 3;
 
+// Crypto utilities for securing balance against client-side tampering (IDOR/DevTools modifications)
+const getCryptoKey = async (): Promise<CryptoKey> => {
+  const enc = new TextEncoder();
+  // Using a static salt/key derivation. For a purely static site without a backend,
+  // we cannot have a true "secret", but this prevents casual DevTools tampering.
+  const keyMaterial = enc.encode("cancunmueve_wallet_secure_salt_v1");
+  return await crypto.subtle.importKey(
+    "raw",
+    keyMaterial,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"]
+  );
+};
+
+const generateSignature = async (amount: number): Promise<string> => {
+  const key = await getCryptoKey();
+  const enc = new TextEncoder();
+  const data = enc.encode(amount.toFixed(2));
+  const signature = await crypto.subtle.sign("HMAC", key, data);
+  // Convert ArrayBuffer to Hex String
+  return Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+};
+
+const verifySignature = async (amount: number, signatureHex: string | undefined): Promise<boolean> => {
+  if (!signatureHex) return false;
+  try {
+    const expectedSignature = await generateSignature(amount);
+    return expectedSignature === signatureHex;
+  } catch (e) {
+    return false;
+  }
+};
+
 /**
  * Migrate balance from localStorage to IndexedDB
  * This consolidates the triple balance system (user_balance, muevecancun_balance, wallet-status)
@@ -47,12 +83,14 @@ export const migrateBalanceFromLocalStorage = async (db: IDBPDatabase): Promise<
         // Preserve the higher balance from localStorage
         if (localBalance > existing.amount) {
           existing.amount = localBalance;
+          existing.signature = await generateSignature(localBalance);
           await store.put(existing, 'current_balance');
           console.log(`[DB] Migrated balance from ${source}: ${localBalance}`);
         }
       } else {
         // Create new balance record
-        await store.put({ id: 'current_balance', amount: localBalance, currency: 'MXN' }, 'current_balance');
+        const signature = await generateSignature(localBalance);
+        await store.put({ id: 'current_balance', amount: localBalance, currency: 'MXN', signature }, 'current_balance');
         console.log(`[DB] Created balance from ${source}: ${localBalance}`);
       }
     }
@@ -103,8 +141,12 @@ export const initDB = async (): Promise<IDBPDatabase> => {
 
       await tx.done;
 
-      // Run migration after DB initialization
-      await migrateBalanceFromLocalStorage(db);
+  if (balance === undefined) {
+    const defaultAmount = 180.00;
+    const signature = await generateSignature(defaultAmount);
+    await store.put({ id: 'current_balance', amount: defaultAmount, currency: 'MXN', signature }, 'current_balance');
+    console.log('[DB] Initial wallet balance set to 180.00 MXN');
+  }
 
       return db;
     } catch (e) {
@@ -116,9 +158,28 @@ export const initDB = async (): Promise<IDBPDatabase> => {
   return dbPromise;
 };
 
-export const getWalletBalance = async (): Promise<{ id: string; amount: number; currency: string } | undefined> => {
+export const getWalletBalance = async (): Promise<{ id: string; amount: number; currency: string; signature?: string } | undefined> => {
   const db = await initDB();
-  return db.get('wallet-status', 'current_balance');
+  const tx = db.transaction('wallet-status', 'readwrite');
+  const store = tx.objectStore('wallet-status');
+  const balance = await store.get('current_balance');
+
+  if (balance) {
+    const isValid = await verifySignature(balance.amount, balance.signature);
+    if (!isValid) {
+      console.error('[SECURITY] Wallet balance signature verification failed. Possible tampering detected. Resetting to 0.00 MXN.');
+      // Punish tampering by resetting balance to 0
+      const resetAmount = 0.00;
+      balance.amount = resetAmount;
+      balance.signature = await generateSignature(resetAmount);
+      await store.put(balance, 'current_balance');
+      await tx.done;
+      return balance;
+    }
+  }
+
+  await tx.done;
+  return balance;
 };
 
 export const setWalletBalance = async (amount: number): Promise<void> => {
@@ -127,11 +188,14 @@ export const setWalletBalance = async (amount: number): Promise<void> => {
   const store = tx.objectStore('wallet-status');
   const existing = await store.get('current_balance');
 
+  const signature = await generateSignature(amount);
+
   if (existing) {
     existing.amount = amount;
+    existing.signature = signature;
     await store.put(existing, 'current_balance');
   } else {
-    await store.put({ id: 'current_balance', amount, currency: 'MXN' }, 'current_balance');
+    await store.put({ id: 'current_balance', amount, currency: 'MXN', signature }, 'current_balance');
   }
 
   await tx.done;
@@ -139,9 +203,15 @@ export const setWalletBalance = async (amount: number): Promise<void> => {
 
 export const updateWalletBalance = async (amount: number) => {
   const db = await initDB();
-  const balance = await db.get('wallet-status', 'current_balance');
+  // We call getWalletBalance first so it can handle tampering validation
+  const balance = await getWalletBalance();
   if (balance) {
-    balance.amount += amount;
-    await db.put('wallet-status', balance, 'current_balance');
+    const tx = db.transaction('wallet-status', 'readwrite');
+    const store = tx.objectStore('wallet-status');
+    const newAmount = balance.amount + amount;
+    balance.amount = newAmount;
+    balance.signature = await generateSignature(newAmount);
+    await store.put(balance, 'current_balance');
+    await tx.done;
   }
 };
