@@ -17,6 +17,9 @@ if [ -f "$HOME/.cargo/env" ]; then
     source $HOME/.cargo/env
 fi
 
+echo "==> Setting default rustup toolchain to stable..."
+rustup default stable
+
 echo "==> Adding wasm32-unknown-unknown target..."
 rustup target add wasm32-unknown-unknown
 
