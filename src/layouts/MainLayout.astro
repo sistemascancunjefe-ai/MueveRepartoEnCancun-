@@ -17,7 +17,7 @@ interface Props {
 
 const {
   title,
-  description = "La app oficial de transporte público para Cancún y Riviera Maya.",
+  description = "Optimiza tus rutas de entrega. Gana mas. Mueve Reparto — la herramienta del repartidor independiente.",
   image = "/og-image.png",
   hideNav = false
 } = Astro.props;
@@ -25,12 +25,11 @@ const {
 const pathname = Astro.url.pathname;
 
 const navItems = [
-  { href: '/home', label: 'Inicio', icon: 'explore', activePattern: /^\/home/ },
-  { href: '/rutas', label: 'Rutas', icon: 'route', activePattern: /^\/rutas/ },
-  { href: '/mapa', label: 'Mapa', icon: 'map', activePattern: /^\/mapa/ },
-  { href: '/community', label: 'Foro', icon: 'forum', activePattern: /^\/community/ },
-  { href: '/wallet', label: 'Wallet', icon: 'account_balance_wallet', activePattern: /^\/wallet/ },
-  { href: '/about', label: 'Nosotros', icon: 'info', activePattern: /^\/about/ },
+  { href: '/home', label: 'Inicio', icon: 'home', activePattern: /^\/home/ },
+  { href: '/pedidos', label: 'Paradas', icon: 'package', activePattern: /^\/pedidos/ },
+  { href: '/reparto', label: 'Ruta', icon: 'route', activePattern: /^\/reparto/ },
+  { href: '/enviar', label: 'Enviar', icon: 'send', activePattern: /^\/enviar/ },
+  { href: '/metricas', label: 'Metricas', icon: 'chart', activePattern: /^\/metricas/ },
 ];
 ---
 
@@ -56,7 +55,7 @@ const navItems = [
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
-    <title>{title} | CancúnMueve</title>
+    <title>{title} | Mueve Reparto</title>
     <meta name="description" content={description} />
     <meta property="og:image" content={image} />
 
@@ -213,48 +212,37 @@ const navItems = [
     { !hideNav && (
     <header class="fixed top-0 left-0 right-0 z-40 h-14 md:h-16 px-4 md:px-6 flex items-center justify-between transition-colors duration-300 app-header">
 
-      <a href="/home" class="flex items-center gap-2.5 no-underline group outline-none" aria-label="CancúnMueve - Inicio">
+      <a href="/home" class="flex items-center gap-2.5 no-underline group outline-none" aria-label="Mueve Reparto - Inicio">
         <div class="w-8 h-8 bg-primary-500 rounded-xl flex items-center justify-center shadow-md shadow-primary-500/20 group-hover:scale-105 transition-transform">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4S4 2.5 4 6v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white" aria-hidden="true"><path d="M19 7c0-1.1-.9-2-2-2h-3l2 4h3c.55 0 1-.45 1-1v-1zm-5-2l-1.5 2.94L11.32 5H8.5L6.24 9H4c-1.1 0-2 .9-2 2v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-3.48L19 7h-5zM7 15.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm10 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
         </div>
-        <!-- Animated Brand -->
-        <BrandAnimation />
+        <span class="text-sm font-black text-slate-800 dark:text-white tracking-tight">Mueve<span class="font-light">Reparto</span></span>
       </a>
 
       <!-- Desktop Navigation -->
       <nav class="hidden md:flex items-center gap-1" aria-label="Desktop navigation">
-        {navItems.map(item => {
-          let i18nKey = '';
-          if (item.href === '/home') i18nKey = 'nav.home';
-          else if (item.href === '/rutas') i18nKey = 'nav.routes';
-          else if (item.href === '/mapa') i18nKey = 'nav.map';
-          else if (item.href === '/community') i18nKey = 'nav.community';
-          else if (item.href === '/wallet') i18nKey = 'nav.wallet';
-          else if (item.href === '/about') i18nKey = 'nav.about';
-
-          return (
-            <a href={item.href}
-               aria-label={item.label}
-               aria-current={item.activePattern.test(pathname) ? 'page' : undefined}
-               class:list={[
-                 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all no-underline',
-                 item.activePattern.test(pathname)
-                   ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
-                   : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-               ]}>
-              <span data-i18n={i18nKey}>{item.label}</span>
-            </a>
-          );
-        })}
+        {navItems.map(item => (
+          <a href={item.href}
+             aria-label={item.label}
+             aria-current={item.activePattern.test(pathname) ? 'page' : undefined}
+             class:list={[
+               'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold transition-all no-underline',
+               item.activePattern.test(pathname)
+                 ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400'
+                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+             ]}>
+            <span>{item.label}</span>
+          </a>
+        ))}
       </nav>
 
       <!-- Controls -->
       <div class="flex items-center gap-2">
-         <!-- Unified Balance Badge -->
-         <a href="/wallet" id="header-balance-badge" class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 no-underline transition-all hover:scale-105 active:scale-95 group" aria-label="Wallet balance">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" aria-hidden="true"></span>
-            <span id="header-balance-amount" class="text-xs font-black text-slate-700 dark:text-slate-300">$180.00</span>
-         </a>
+         <!-- Trial badge -->
+         <span class="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-700 text-xs font-black text-teal-700 dark:text-teal-300">
+            <span class="w-2 h-2 rounded-full bg-teal-500 shadow-[0_0_8px_rgba(20,184,166,0.5)]" aria-hidden="true"></span>
+            Trial · 30 dias
+         </span>
 
          <button class="theme-toggle w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
                  style="color: var(--text-secondary);" aria-label="Toggle dark mode">

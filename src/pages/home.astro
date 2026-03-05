@@ -1,212 +1,301 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
-import InteractiveMap from '../components/InteractiveMap.astro';
-import RouteCalculator from '../components/RouteCalculator.astro';
 
 const title = "Inicio";
 ---
 
 <MainLayout title={title}>
-    <!-- Full-screen Background Map -->
-    <div class="fixed inset-0 z-0 h-full w-full">
-        <InteractiveMap center={[21.1619, -86.8515]} zoom={13} />
+  <div class="dashboard">
+
+    <!-- Greeting + Ring -->
+    <div class="card card-glow">
+      <div class="ring-row">
+        <div class="ring-wrap">
+          <svg class="ring-svg" width="90" height="90" viewBox="0 0 90 90">
+            <circle class="ring-bg" cx="45" cy="45" r="36" stroke-width="7"/>
+            <circle class="ring-fill" id="ring-circle" cx="45" cy="45" r="36" stroke-width="7"
+              stroke-dasharray="226.2" stroke-dashoffset="226.2"/>
+          </svg>
+          <div class="ring-center">
+            <span class="ring-pct" id="ring-pct">0%</span>
+            <span class="ring-sub">listo</span>
+          </div>
+        </div>
+        <div class="greeting-info">
+          <p class="greeting-date" id="home-date">—</p>
+          <h1 class="greeting-msg" id="home-greeting">Buenos dias</h1>
+          <p class="greeting-stats">
+            <span id="home-delivered">0</span> entregados &middot;
+            <span id="home-pending">0</span> pendientes
+          </p>
+        </div>
+      </div>
     </div>
 
-    <!-- Dashboard Overlay -->
-	<div class="dashboard-container pointer-events-none">
-		<div class="glass-panel-wrapper animate-fade-in-up pointer-events-auto flex flex-col items-center">
-
-            <!-- Hero Headline — compact, doesn't overlap header -->
-            <div class="hero-headline mb-4 text-center px-2">
-                <h1 class="hero-title font-display font-black text-2xl sm:text-3xl md:text-4xl tracking-tight leading-tight">
-                    ¿Qué Ruta Me Lleva?
-                </h1>
-                <p class="hero-destination font-display font-bold text-base sm:text-lg mt-1">
-                    en <span id="destination-cycle" class="destination-text">Cancún</span>
-                </p>
-            </div>
-
-			<RouteCalculator />
-		</div>
+    <!-- Metric tiles -->
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-val t" id="m-entregados">0</div>
+        <div class="metric-lbl">Entregados</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val c" id="m-urgentes">0</div>
+        <div class="metric-lbl">Urgentes</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val a" id="m-ingreso">$0</div>
+        <div class="metric-lbl">Ingreso est.</div>
+      </div>
+      <div class="metric">
+        <div class="metric-val" id="m-total">0</div>
+        <div class="metric-lbl">Total hoy</div>
+      </div>
     </div>
 
+    <!-- Quick Actions -->
+    <div class="section">
+      <p class="section-title">Acciones rapidas</p>
+      <div class="actions-grid">
+        <a href="/pedidos?add=1" class="btn btn-primary">+ Agregar parada</a>
+        <a href="/reparto" class="btn btn-ghost">Ver ruta &rarr;</a>
+      </div>
+    </div>
+
+    <!-- Next stops preview -->
+    <div class="section">
+      <div class="section-header">
+        <p class="section-title">Proximas paradas</p>
+        <a href="/pedidos" class="section-link">Ver todas &rarr;</a>
+      </div>
+      <div id="home-stops" class="stops-list"></div>
+    </div>
+
+    <!-- Optimize CTA -->
+    <div class="card card-coral hidden" id="home-cta">
+      <div class="cta-row">
+        <div>
+          <p class="cta-label">RUTA LISTA PARA OPTIMIZAR</p>
+          <p class="cta-desc"><span id="cta-count">0</span> paradas &middot; Calcula con NN+2opt</p>
+        </div>
+        <a href="/reparto" class="btn btn-coral btn-sm">Optimizar &rarr;</a>
+      </div>
+    </div>
+
+  </div>
 </MainLayout>
 
 <script>
-    // Animated destination cycling
-    const destinations = ['Cancún', 'Puerto Morelos', 'Isla Mujeres', 'Playa del Carmen', 'Zona Hotelera'];
-    let currentIndex = 0;
-    const cycleEl = document.getElementById('destination-cycle');
-    if (cycleEl) {
-        setInterval(() => {
-            cycleEl.classList.add('destination-exit');
-            setTimeout(() => {
-                currentIndex = (currentIndex + 1) % destinations.length;
-                cycleEl.textContent = destinations[currentIndex];
-                cycleEl.classList.remove('destination-exit');
-                cycleEl.classList.add('destination-enter');
-                setTimeout(() => cycleEl.classList.remove('destination-enter'), 400);
-            }, 300);
-        }, 3000);
-    }
+// ── State (shared via sessionStorage for multi-page nav) ──────────────────
+const STORE_KEY = 'mr_stops';
 
-    // Handle View Switching (Minimize/Maximize UI)
-    window.addEventListener('VIEW_STATE_CHANGE', (e) => {
-        const state = (e as CustomEvent).detail;
-        const container = document.querySelector('.dashboard-container');
-        if (!container) return;
+function getStops() {
+  try {
+    return JSON.parse(sessionStorage.getItem(STORE_KEY) || '[]');
+  } catch { return []; }
+}
 
-        container.classList.remove('map-mode', 'map-maximized');
+function uid(n = 12) {
+  return [...crypto.getRandomValues(new Uint8Array(n))]
+    .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, n);
+}
 
-        if (state === 'MAP_ACTIVE' || state === 'map') {
-            container.classList.add('map-mode');
-        } else if (state === 'MAP_MAXIMIZED') {
-            container.classList.add('map-maximized');
-        }
-    });
+// Seed demo data once
+function seedDemoIfEmpty() {
+  if (getStops().length > 0) return;
+  const demo = [
+    { id: uid(), address: 'SM 23, Mza 5, Lote 12, Cancun', phone: '9981234567', ref: 'Casa azul', priority: 'urgent', status: 'delivered', lat: 21.1711, lng: -86.8487, token: uid(8), source: 'manual', seq: null },
+    { id: uid(), address: 'Av. Tulum 280, SM 4, Cancun', phone: '9987654321', ref: '', priority: 'normal', status: 'delivered', lat: 21.1634, lng: -86.8372, token: uid(8), source: 'manual', seq: null },
+    { id: uid(), address: 'SM 57, Mza 14, Lote 3, Cancun', phone: '', ref: 'Edificio Coral', priority: 'normal', status: 'in_route', lat: 21.1549, lng: -86.8522, token: uid(8), source: 'manual', seq: 3 },
+    { id: uid(), address: 'Av. Kabah km 2.5, SM 35', phone: '9989876543', ref: '', priority: 'urgent', status: 'pending', lat: 21.1488, lng: -86.8444, token: uid(8), source: 'manual', seq: 4 },
+    { id: uid(), address: 'Blvd. Kukulcan km 9, Zona Hotelera', phone: '9981112222', ref: 'Hotel Sunset', priority: 'normal', status: 'pending', lat: 21.1326, lng: -86.7854, token: uid(8), source: 'link', seq: 5 },
+  ];
+  sessionStorage.setItem(STORE_KEY, JSON.stringify(demo));
+}
+
+function render() {
+  seedDemoIfEmpty();
+  const stops = getStops();
+
+  const now = new Date();
+  const h = now.getHours();
+  const greet = h < 12 ? 'Buenos dias' : h < 18 ? 'Buenas tardes' : 'Buenas noches';
+  (document.getElementById('home-greeting') as HTMLElement).textContent = greet;
+  (document.getElementById('home-date') as HTMLElement).textContent =
+    now.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const delivered = stops.filter((s: any) => s.status === 'delivered').length;
+  const pending   = stops.filter((s: any) => s.status === 'pending' || s.status === 'in_route').length;
+  const urgent    = stops.filter((s: any) => s.priority === 'urgent' && s.status !== 'delivered').length;
+  const total     = stops.length;
+  const pct       = total > 0 ? Math.round(delivered / total * 100) : 0;
+
+  (document.getElementById('home-delivered') as HTMLElement).textContent = String(delivered);
+  (document.getElementById('home-pending') as HTMLElement).textContent   = String(pending);
+  (document.getElementById('m-entregados') as HTMLElement).textContent   = String(delivered);
+  (document.getElementById('m-urgentes') as HTMLElement).textContent     = String(urgent);
+  (document.getElementById('m-ingreso') as HTMLElement).textContent      = `$${delivered * 13}`;
+  (document.getElementById('m-total') as HTMLElement).textContent        = String(total);
+  (document.getElementById('ring-pct') as HTMLElement).textContent       = pct + '%';
+
+  const circ = 2 * Math.PI * 36;
+  const circle = document.getElementById('ring-circle') as SVGCircleElement | null;
+  if (circle) circle.style.strokeDashoffset = String(circ * (1 - pct / 100));
+
+  // Preview next 4 pending stops
+  const next = stops
+    .filter((s: any) => s.status === 'pending' || s.status === 'in_route')
+    .sort((a: any, b: any) => (b.priority === 'urgent' ? 1 : 0) - (a.priority === 'urgent' ? 1 : 0))
+    .slice(0, 4);
+
+  const container = document.getElementById('home-stops') as HTMLElement;
+  if (next.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p class="empty-icon">📦</p><p class="empty-title">Sin paradas</p><p class="empty-desc">Agrega tus pedidos del dia</p><a href="/pedidos?add=1" class="btn btn-primary btn-sm" style="margin-top:.5rem">+ Agregar</a></div>`;
+  } else {
+    container.innerHTML = next.map((s: any) => stopHTML(s)).join('');
+  }
+
+  const cta = document.getElementById('home-cta') as HTMLElement;
+  (document.getElementById('cta-count') as HTMLElement).textContent = String(pending);
+  cta.classList.toggle('hidden', pending < 2);
+}
+
+function stopHTML(s: any) {
+  const priColor = s.priority === 'urgent' ? '#ef4444' : s.priority === 'extra' ? '#8b5cf6' : '#0d9488';
+  const stLabel  = { pending: 'Pendiente', in_route: 'En ruta', delivered: 'Entregado', failed: 'Fallido' }[s.status as string] || s.status;
+  const stClass  = { pending: 'badge-dim', in_route: 'badge-teal', delivered: 'badge-green', failed: 'badge-red' }[s.status as string] || 'badge-dim';
+  return `<div class="stop-card" style="--pri-color:${priColor}">
+    <div class="stop-seq">${s.seq || '·'}</div>
+    <div class="stop-body">
+      <p class="stop-addr">${s.address}</p>
+      <div class="stop-meta">
+        <span class="badge ${stClass}">${stLabel}</span>
+        ${s.phone ? '<span class="badge badge-dim">📱</span>' : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+document.addEventListener('astro:page-load', render);
 </script>
 
 <style>
-/* Dashboard Shell */
-.dashboard-container {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    padding: 0.75rem;
-    padding-top: calc(var(--header-h) + 0.5rem);
-    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 0.5rem);
-    pointer-events: none;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
-.glass-panel-wrapper {
-    width: 100%;
-    max-width: 440px;
-    margin: auto auto 0;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    pointer-events: auto;
+/* Cards */
+.card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: 1.1rem 1.15rem;
+}
+.card-glow {
+  background: linear-gradient(135deg, rgba(13,148,136,.05), rgba(6,182,212,.04));
+  border-color: rgba(13,148,136,.2);
+  box-shadow: 0 0 28px rgba(13,148,136,.06), inset 0 1px 0 rgba(13,148,136,.08);
+}
+.card-coral {
+  background: linear-gradient(135deg, rgba(239,68,68,.06), rgba(249,115,22,.04));
+  border-color: rgba(239,68,68,.2);
 }
 
-/* Hero Headline Styles */
-.hero-headline {
-    transition: opacity 0.3s ease, transform 0.3s ease;
+/* Ring */
+.ring-row { display: flex; align-items: center; gap: 1rem; }
+.ring-wrap { position: relative; width: 90px; height: 90px; flex-shrink: 0; }
+.ring-svg { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: rgba(0,0,0,.07); }
+:global(.dark) .ring-bg { stroke: rgba(255,255,255,.07); }
+.ring-fill { fill: none; stroke: var(--color-teal); stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.16,1,.3,1); }
+.ring-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.ring-pct { font-family: monospace; font-size: 1.4rem; font-weight: 700; color: var(--text-primary); line-height: 1; }
+.ring-sub { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-tertiary); }
+
+.greeting-info { flex: 1; }
+.greeting-date { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-tertiary); margin-bottom: .25rem; }
+.greeting-msg { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin-bottom: .15rem; }
+.greeting-stats { font-size: .82rem; color: var(--text-secondary); }
+
+/* Metrics */
+.metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; }
+.metric {
+  background: var(--surface-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  padding: .9rem;
 }
+.metric-val { font-family: monospace; font-size: 1.75rem; font-weight: 700; line-height: 1; margin-bottom: .2rem; }
+.metric-val.t { color: var(--color-teal); }
+.metric-val.c { color: #ef4444; }
+.metric-val.a { color: #f97316; }
+.metric-lbl { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-tertiary); }
 
-.hero-title {
-    color: #F97316;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.15);
-    animation: hero-bounce-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+/* Actions */
+.section { display: flex; flex-direction: column; gap: .65rem; }
+.section-title { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); margin: 0; }
+.section-header { display: flex; align-items: center; justify-content: space-between; }
+.section-link { font-size: .78rem; font-weight: 700; color: var(--color-teal); text-decoration: none; }
+.section-link:hover { text-decoration: underline; }
+
+.actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .55rem 1.1rem; border-radius: var(--radius-md); border: none; cursor: pointer;
+  font-size: .88rem; font-weight: 700; text-decoration: none;
+  transition: all .15s cubic-bezier(.16,1,.3,1);
+  -webkit-tap-highlight-color: transparent;
 }
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 4px 14px rgba(13,148,136,.25); }
+.btn-primary:hover { box-shadow: 0 6px 20px rgba(13,148,136,.4); }
+.btn-ghost { background: rgba(0,0,0,.04); color: var(--text-secondary); border: 1px solid var(--border-light); }
+:global(.dark) .btn-ghost { background: rgba(255,255,255,.05); }
+.btn-ghost:hover { background: rgba(0,0,0,.08); }
+.btn-coral { background: linear-gradient(135deg,#ef4444,#dc2626); color: white; box-shadow: 0 4px 14px rgba(239,68,68,.25); }
+.btn-sm { padding: .35rem .75rem; font-size: .8rem; }
 
-.hero-destination {
-    color: var(--text-secondary);
-    text-shadow: 0 1px 6px rgba(255, 255, 255, 0.6);
+/* CTA */
+.hidden { display: none !important; }
+.cta-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.cta-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #ef4444; margin-bottom: .2rem; }
+.cta-desc { font-size: .85rem; font-weight: 600; color: var(--text-primary); }
+
+/* Stop cards */
+.stops-list { display: flex; flex-direction: column; gap: .4rem; }
+.stop-card {
+  display: flex; align-items: flex-start; gap: .65rem;
+  background: var(--surface-card); border: 1px solid var(--border-light);
+  border-radius: var(--radius-md); padding: .75rem;
+  border-left: 3px solid var(--pri-color, var(--color-teal));
 }
-
-.dark .hero-destination {
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+.stop-seq {
+  width: 32px; height: 32px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,.04); border: 1px solid var(--border-light);
+  font-family: monospace; font-size: .78rem; font-weight: 700; color: var(--text-secondary);
 }
+:global(.dark) .stop-seq { background: rgba(255,255,255,.06); }
+.stop-body { flex: 1; min-width: 0; }
+.stop-addr { font-size: .88rem; font-weight: 600; color: var(--text-primary); margin-bottom: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-meta { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; }
 
-.destination-text {
-    display: inline-block;
-    color: #0d9488;
-    font-weight: 800;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-}
+/* Badges */
+.badge { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 99px; font-size: .62rem; font-weight: 700; border: 1px solid; }
+.badge-dim { color: var(--text-tertiary); border-color: var(--border-light); background: transparent; }
+.badge-teal { color: var(--color-teal); border-color: rgba(13,148,136,.3); background: rgba(13,148,136,.08); }
+.badge-green { color: #16a34a; border-color: rgba(22,163,74,.3); background: rgba(22,163,74,.08); }
+.badge-red { color: #ef4444; border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.08); }
 
-.destination-exit {
-    opacity: 0;
-    transform: translateY(-8px);
-}
-
-.destination-enter {
-    animation: destination-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes destination-pop {
-    0%   { opacity: 0; transform: translateY(8px); }
-    100% { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes hero-bounce-in {
-    0%   { opacity: 0; transform: scale(0.9) translateY(12px); }
-    60%  { transform: scale(1.02) translateY(-2px); }
-    100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* Map Mode Adjustments */
-.dashboard-container.map-mode .hero-headline {
-    opacity: 0;
-    transform: translateY(-20px);
-    pointer-events: none;
-    height: 0;
-    margin: 0;
-    overflow: hidden;
-}
-
-.dashboard-container.map-mode .glass-panel-wrapper {
-    transform: translateY(10%) scale(0.95);
-    opacity: 0.95;
-}
-
-.dashboard-container.map-maximized .glass-panel-wrapper {
-    transform: translateY(40%) scale(0.9);
-    opacity: 0.8;
-}
-
-@media (min-width: 768px) {
-    .dashboard-container {
-        justify-content: center;
-        align-items: flex-start;
-        padding: 2rem;
-        padding-top: calc(var(--header-h) + 2rem);
-        padding-bottom: 2rem;
-        overflow-y: auto;
-    }
-
-    .glass-panel-wrapper {
-        margin: auto 0 auto 2rem;
-        max-width: 420px;
-    }
-}
-
-@media (min-width: 1280px) {
-    .dashboard-container {
-        padding-left: 4rem;
-    }
-
-    .glass-panel-wrapper {
-        margin-left: 3rem;
-    }
-}
-
-/* Animations */
-@keyframes fade-in-up {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in-up {
-    animation: fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Search card subtle scale entrance */
-.search-card {
-    animation: card-enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
-}
-
-@keyframes card-enter {
-    from {
-        opacity: 0;
-        transform: scale(0.96) translateY(8px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
+/* Empty state */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 2rem 1rem; text-align: center; }
+.empty-icon { font-size: 2.5rem; filter: grayscale(.4); }
+.empty-title { font-size: .9rem; font-weight: 700; color: var(--text-secondary); }
+.empty-desc { font-size: .8rem; color: var(--text-tertiary); }
 </style>

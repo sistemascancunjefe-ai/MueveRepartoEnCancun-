@@ -1,0 +1,568 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+
+const title = "Ruta";
+---
+
+<MainLayout title={title}>
+  <div class="route-page">
+
+    <!-- Map -->
+    <div id="map-container" class="map-container">
+      <div id="reparto-map"></div>
+      <div class="gps-chip hidden" id="gps-chip">
+        <span class="pulse-dot"></span> GPS activo
+      </div>
+      <div class="algo-badge" id="algo-badge">Sin optimizar</div>
+    </div>
+
+    <!-- Bottom sheet -->
+    <div class="route-sheet" id="route-sheet">
+      <div class="sheet-handle"></div>
+
+      <div class="sheet-top">
+        <div class="sheet-title-row">
+          <span class="sheet-title">Ruta del Dia</span>
+          <button class="btn btn-primary btn-sm" id="btn-optimize">
+            <span id="opt-label">Optimizar</span>
+            <span class="loader hidden" id="opt-loader"></span>
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="route-stats hidden" id="route-stats">
+          <div class="rstat"><div class="rstat-v" id="rs-km">—</div><div class="rstat-l">km</div></div>
+          <div class="rstat"><div class="rstat-v" id="rs-min">—</div><div class="rstat-l">min est.</div></div>
+          <div class="rstat"><div class="rstat-v" id="rs-stops">—</div><div class="rstat-l">paradas</div></div>
+          <div class="rstat"><div class="rstat-v" id="rs-zones">—</div><div class="rstat-l">zonas</div></div>
+        </div>
+      </div>
+
+      <!-- Next stop card -->
+      <div class="next-stop hidden" id="next-stop">
+        <div class="next-icon">📍</div>
+        <div class="next-info">
+          <p class="next-label">Siguiente parada</p>
+          <p class="next-addr" id="next-addr">—</p>
+        </div>
+        <div class="next-actions">
+          <button class="btn btn-primary btn-sm" id="btn-nav-next">Nav.</button>
+          <button class="btn btn-ghost btn-sm" id="btn-done-next">✓</button>
+        </div>
+      </div>
+
+      <!-- Stop list -->
+      <div class="sheet-list" id="route-list">
+        <div class="empty-state">
+          <p class="empty-icon">📦</p>
+          <p class="empty-title">Sin paradas</p>
+          <p class="empty-desc">Agrega paradas en la seccion Paradas</p>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="sheet-footer">
+        <button class="btn btn-ghost btn-sm flex-1" id="btn-share">Compartir ruta</button>
+        <button class="btn btn-ghost btn-sm flex-1" id="btn-nav-osm" disabled>Nav. OSM</button>
+      </div>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+const STORE_KEY = 'mr_stops';
+
+function getStops(): any[] {
+  try { return JSON.parse(sessionStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+}
+
+function saveStops(stops: any[]) { sessionStorage.setItem(STORE_KEY, JSON.stringify(stops)); }
+
+// ── Haversine distance ──────────────────────────────────────────────
+function haversine(a: {lat:number;lng:number}, b: {lat:number;lng:number}): number {
+  const R = 6371;
+  const dLat = (b.lat - a.lat) * Math.PI / 180;
+  const dLng = (b.lng - a.lng) * Math.PI / 180;
+  const h = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.asin(Math.sqrt(h));
+}
+
+// ── K-Means clustering ─────────────────────────────────────────────
+function kMeans(stops: any[], k: number): number[][] {
+  if (stops.length <= k) return stops.map((_: any, i: number) => [i]);
+  let centers = stops.slice(0, k).map((s: any) => ({ lat: s.lat, lng: s.lng }));
+  let asgn = new Array(stops.length).fill(0);
+  for (let iter = 0; iter < 20; iter++) {
+    let changed = false;
+    for (let i = 0; i < stops.length; i++) {
+      let best = 0, bestD = Infinity;
+      centers.forEach((c: any, ci: number) => { const d = haversine(stops[i], c); if (d < bestD) { bestD = d; best = ci; } });
+      if (asgn[i] !== best) { asgn[i] = best; changed = true; }
+    }
+    if (!changed) break;
+    const sums = Array.from({length: k}, () => ({ lat: 0, lng: 0, n: 0 }));
+    for (let i = 0; i < stops.length; i++) { sums[asgn[i]].lat += stops[i].lat; sums[asgn[i]].lng += stops[i].lng; sums[asgn[i]].n++; }
+    centers = sums.map((s: any, ci: number) => s.n > 0 ? { lat: s.lat/s.n, lng: s.lng/s.n } : centers[ci]);
+  }
+  const clusters: number[][] = Array.from({length: k}, () => []);
+  for (let i = 0; i < stops.length; i++) clusters[asgn[i]].push(i);
+  return clusters.filter((c: number[]) => c.length > 0);
+}
+
+// ── Nearest Neighbor ────────────────────────────────────────────────
+function nearestNeighbor(stops: any[], indices: number[], origin: {lat:number;lng:number}): number[] {
+  if (indices.length <= 1) return indices;
+  const unvisited = new Set(indices);
+  const route: number[] = [];
+  let cur = origin;
+  while (unvisited.size > 0) {
+    let best: number | null = null, bestD = Infinity;
+    for (const i of unvisited) {
+      const d = haversine(cur, stops[i]);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    route.push(best!); unvisited.delete(best!); cur = stops[best!];
+  }
+  return route;
+}
+
+// ── 2-opt improvement ───────────────────────────────────────────────
+function twoOpt(stops: any[], route: number[]): number[] {
+  let best = [...route], improved = true, iter = 0;
+  while (improved && iter++ < 100) {
+    improved = false;
+    for (let i = 0; i < best.length - 1; i++) {
+      for (let j = i + 2; j < best.length; j++) {
+        const d1 = haversine(stops[best[i]], stops[best[i+1]]) + haversine(stops[best[j]], stops[best[(j+1)%best.length]]);
+        const d2 = haversine(stops[best[i]], stops[best[j]])   + haversine(stops[best[i+1]], stops[best[(j+1)%best.length]]);
+        if (d2 < d1 - 1e-10) {
+          best = [...best.slice(0,i+1), ...best.slice(i+1,j+1).reverse(), ...best.slice(j+1)];
+          improved = true;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// ── Main optimizer (K-Means + NN + 2-opt) ──────────────────────────
+function optimizeNexus(stops: any[], origin: {lat:number;lng:number}) {
+  if (!stops.length) return { ordered: [], distKm: 0, minutes: 0, zones: 0 };
+  const n = stops.length;
+  const k = n <= 5 ? 1 : n <= 15 ? 2 : n <= 30 ? 3 : 4;
+  const clusters = kMeans(stops, k);
+  clusters.sort((a, b) => {
+    const ca = { lat: a.reduce((s: number, i: number) => s + stops[i].lat, 0)/a.length, lng: a.reduce((s: number, i: number) => s + stops[i].lng, 0)/a.length };
+    const cb = { lat: b.reduce((s: number, i: number) => s + stops[i].lat, 0)/b.length, lng: b.reduce((s: number, i: number) => s + stops[i].lng, 0)/b.length };
+    return haversine(origin, ca) - haversine(origin, cb);
+  });
+  let finalOrder: number[] = [], lastPt = origin;
+  for (const cluster of clusters) {
+    const nn = nearestNeighbor(stops, cluster, lastPt);
+    const opt = twoOpt(stops, nn);
+    finalOrder = [...finalOrder, ...opt];
+    lastPt = stops[opt[opt.length - 1]];
+  }
+  const pts = [origin, ...finalOrder.map((i: number) => stops[i])];
+  let dist = 0;
+  for (let i = 0; i < pts.length - 1; i++) dist += haversine(pts[i], pts[i+1]);
+  return {
+    ordered: finalOrder.map((i: number, si: number) => ({ ...stops[i], _idx: i, seq: si + 1 })),
+    distKm: Math.round(dist * 10) / 10,
+    minutes: Math.round((dist / 25) * 60 + stops.length * 3),
+    zones: clusters.length,
+  };
+}
+
+// ── State ────────────────────────────────────────────────────────
+let map: any = null;
+let markerLayer: any = null;
+let routeLayer: any = null;
+let userMarker: any = null;
+let userPos = { lat: 21.1619, lng: -86.8515 };
+let optimizedRoute: any = null;
+let isOptimizing = false;
+
+// ── Map init ────────────────────────────────────────────────────
+async function initMap() {
+  if (map) { setTimeout(() => map.invalidateSize(), 100); return; }
+
+  // Lazy-load Leaflet
+  if (!window.L) {
+    await new Promise<void>(resolve => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+      document.head.appendChild(link);
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+      script.onload = () => resolve();
+      document.head.appendChild(script);
+    });
+  }
+
+  const L = (window as any).L;
+  map = L.map('reparto-map', { zoomControl: true }).setView([userPos.lat, userPos.lng], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 20
+  }).addTo(map);
+  markerLayer = L.layerGroup().addTo(map);
+  routeLayer  = L.layerGroup().addTo(map);
+
+  // GPS
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(pos => {
+      userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.circleMarker([userPos.lat, userPos.lng], {
+        radius: 9, fillColor: '#f97316', fillOpacity: 1, color: '#000', weight: 2.5
+      }).bindPopup('Tu posicion').addTo(map);
+      document.getElementById('gps-chip')!.classList.remove('hidden');
+    }, null, { enableHighAccuracy: true, maximumAge: 5000 });
+  }
+
+  renderRoutePanel();
+}
+
+// ── Plot markers ─────────────────────────────────────────────────
+function plotMarkers(stops: any[], route: any[] | null) {
+  if (!map) return;
+  const L = (window as any).L;
+  markerLayer.clearLayers();
+  routeLayer.clearLayers();
+
+  // Origin
+  const oIcon = L.divIcon({className:'', iconSize:[30,30], iconAnchor:[15,15],
+    html:`<div style="width:30px;height:30px;background:linear-gradient(135deg,#f97316,#ea580c);border:2px solid #000;border-radius:50%;display:grid;place-items:center;font-size:14px;box-shadow:0 0 10px rgba(249,115,22,.5)">🛵</div>`});
+  L.marker([userPos.lat, userPos.lng], {icon: oIcon}).bindPopup('Tu posicion').addTo(markerLayer);
+
+  const colors = ['#0d9488','#0891b2','#7c3aed','#16a34a','#d97706'];
+  const ordered = route || stops;
+  ordered.forEach((s: any, i: number) => {
+    const c = s.priority === 'urgent' ? '#ef4444' : s.priority === 'extra' ? '#8b5cf6' : colors[i % colors.length];
+    const icon = L.divIcon({className:'', iconSize:[30,30], iconAnchor:[15,15],
+      html:`<div style="width:30px;height:30px;background:${c};border:2px solid #000;border-radius:50%;display:grid;place-items:center;font-family:monospace;font-size:11px;font-weight:700;color:${s.priority==='urgent'?'#fff':'#fff'};box-shadow:0 2px 8px rgba(0,0,0,.3)">${s.seq||i+1}</div>`});
+    L.marker([s.lat, s.lng], {icon}).bindPopup(`<b>#${s.seq||i+1}</b><br>${s.address}`).addTo(markerLayer);
+  });
+
+  if (route && route.length > 1) {
+    const pts = [[userPos.lat, userPos.lng], ...route.map((s: any) => [s.lat, s.lng])];
+    L.polyline(pts, {color:'#0d9488', weight:3, opacity:.7}).addTo(routeLayer);
+  }
+
+  const allPts = [[userPos.lat, userPos.lng], ...stops.map((s: any) => [s.lat, s.lng])];
+  if (allPts.length > 1) map.fitBounds(allPts, {padding:[50,50]});
+}
+
+// ── Render panel ─────────────────────────────────────────────────
+function renderRoutePanel() {
+  const stops = getStops().filter((s: any) => s.status !== 'delivered' && s.lat && s.lng);
+  const ordered = optimizedRoute?.ordered || stops;
+
+  const nextPending = ordered.find((s: any) => s.status === 'pending' || s.status === 'in_route');
+  const nextEl = document.getElementById('next-stop') as HTMLElement;
+  if (nextPending) {
+    nextEl.classList.remove('hidden');
+    (document.getElementById('next-addr') as HTMLElement).textContent = nextPending.address;
+  } else {
+    nextEl.classList.add('hidden');
+  }
+
+  const listEl = document.getElementById('route-list') as HTMLElement;
+  if (ordered.length === 0) {
+    listEl.innerHTML = `<div class="empty-state"><p class="empty-icon">📦</p><p class="empty-title">Sin paradas con coordenadas</p><p class="empty-desc"><a href="/pedidos" class="link">Agregar paradas</a></p></div>`;
+    return;
+  }
+  listEl.innerHTML = ordered.map((s: any, i: number) => {
+    const dist = i === 0 ? haversine(userPos, s) : haversine(ordered[i-1], s);
+    return `<div class="route-item" data-lat="${s.lat}" data-lng="${s.lng}">
+      <div class="ri-num">${s.seq || i+1}</div>
+      <div class="ri-addr">${s.address}</div>
+      <div class="ri-dist">${dist.toFixed(1)}km</div>
+      ${s.status !== 'delivered' ? `<button class="btn btn-xs btn-green" data-done="${s.id}">✓</button>` : `<span class="badge-done">✓</span>`}
+    </div>`;
+  }).join('');
+
+  // Wire done buttons
+  listEl.querySelectorAll('[data-done]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = (btn as HTMLElement).dataset.done!;
+      const stops = getStops();
+      const s = stops.find((x: any) => x.id === id);
+      if (s) { s.status = 'delivered'; s.seq = null; }
+      saveStops(stops);
+      renderRoutePanel();
+      plotMarkers(getStops().filter((s: any) => s.status !== 'delivered' && s.lat && s.lng), optimizedRoute?.ordered || null);
+      window.showToast?.('✓ Entregado', 'success');
+    });
+  });
+
+  // Map center on click
+  listEl.querySelectorAll('.route-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      const lat = +(item as HTMLElement).dataset.lat!;
+      const lng = +(item as HTMLElement).dataset.lng!;
+      map?.setView([lat, lng], 16);
+    });
+  });
+
+  if (map) plotMarkers(stops, optimizedRoute?.ordered || null);
+}
+
+// ── Optimize ──────────────────────────────────────────────────────
+async function runOptimize() {
+  if (isOptimizing) return;
+  const stops = getStops().filter((s: any) => s.status !== 'delivered' && s.lat && s.lng);
+  if (stops.length < 2) { window.showToast?.('Necesitas al menos 2 paradas con coordenadas', 'error'); return; }
+
+  isOptimizing = true;
+  const btn = document.getElementById('btn-optimize') as HTMLButtonElement;
+  btn.disabled = true;
+  document.getElementById('opt-label')!.classList.add('hidden');
+  document.getElementById('opt-loader')!.classList.remove('hidden');
+
+  await new Promise(r => setTimeout(r, 60));
+
+  const result = optimizeNexus(stops, userPos);
+  optimizedRoute = result;
+
+  // Update sequences in store
+  const allStops = getStops();
+  result.ordered.forEach((s: any) => {
+    const found = allStops.find((x: any) => x.id === s.id);
+    if (found) found.seq = s.seq;
+  });
+  saveStops(allStops);
+
+  document.getElementById('route-stats')!.classList.remove('hidden');
+  (document.getElementById('rs-km') as HTMLElement).textContent    = String(result.distKm);
+  (document.getElementById('rs-min') as HTMLElement).textContent   = String(result.minutes);
+  (document.getElementById('rs-stops') as HTMLElement).textContent = String(result.ordered.length);
+  (document.getElementById('rs-zones') as HTMLElement).textContent = String(result.zones);
+
+  const badge = document.getElementById('algo-badge') as HTMLElement;
+  badge.textContent = `K-Means(${result.zones}) + NN + 2-opt ✓`;
+  badge.style.color = '#0d9488';
+
+  (document.getElementById('btn-nav-osm') as HTMLButtonElement).disabled = false;
+
+  btn.disabled = false;
+  document.getElementById('opt-label')!.classList.remove('hidden');
+  document.getElementById('opt-label')!.textContent = 'Recalcular';
+  document.getElementById('opt-loader')!.classList.add('hidden');
+  isOptimizing = false;
+
+  renderRoutePanel();
+  plotMarkers(stops, result.ordered);
+  window.showToast?.(`Ruta: ${result.distKm}km · ~${result.minutes}min · ${result.zones} zona${result.zones > 1 ? 's' : ''}`, 'success');
+}
+
+function markNextDone() {
+  const ordered = optimizedRoute?.ordered || getStops().filter((s: any) => s.lat);
+  const next = ordered.find((s: any) => s.status === 'pending' || s.status === 'in_route');
+  if (!next) return;
+  const stops = getStops();
+  const s = stops.find((x: any) => x.id === next.id);
+  if (s) { s.status = 'delivered'; }
+  saveStops(stops);
+  renderRoutePanel();
+  window.showToast?.('✓ Entregado', 'success');
+}
+
+function openNavNext() {
+  const ordered = optimizedRoute?.ordered || getStops().filter((s: any) => s.lat);
+  const next = ordered.find((s: any) => s.status === 'pending' || s.status === 'in_route');
+  if (next) window.open(`https://www.google.com/maps/dir/?api=1&origin=${userPos.lat},${userPos.lng}&destination=${next.lat},${next.lng}&travelmode=driving`, '_blank');
+}
+
+function openOSMRoute() {
+  if (!optimizedRoute?.ordered?.length) return;
+  const first = optimizedRoute.ordered[0];
+  window.open(`https://www.openstreetmap.org/directions?from=${userPos.lat},${userPos.lng}&to=${first.lat},${first.lng}`, '_blank');
+}
+
+function shareRoute() {
+  const ordered = optimizedRoute?.ordered || getStops().filter((s: any) => s.lat);
+  if (!ordered.length) { window.showToast?.('Optimiza primero', 'error'); return; }
+  const text = `Ruta Mueve Reparto\n${ordered.map((s: any, i: number) => `${i+1}. ${s.address}`).join('\n')}\n\n${optimizedRoute?.distKm || '?'}km · ~${optimizedRoute?.minutes || '?'}min`;
+  if (navigator.share) navigator.share({ title: 'Ruta del dia', text }).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => window.showToast?.('Ruta copiada', 'info'));
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+function init() {
+  initMap();
+
+  document.getElementById('btn-optimize')?.addEventListener('click', runOptimize);
+  document.getElementById('btn-nav-next')?.addEventListener('click', openNavNext);
+  document.getElementById('btn-done-next')?.addEventListener('click', markNextDone);
+  document.getElementById('btn-nav-osm')?.addEventListener('click', openOSMRoute);
+  document.getElementById('btn-share')?.addEventListener('click', shareRoute);
+}
+
+document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+.route-page {
+  position: fixed;
+  inset: 0;
+  top: 3.5rem; /* header height */
+  bottom: 4rem; /* bottom nav height */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Map */
+.map-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 200px;
+}
+
+#reparto-map {
+  position: absolute;
+  inset: 0;
+}
+
+.gps-chip {
+  position: absolute; top: .75rem; right: .75rem; z-index: 1000;
+  background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+  border: 1px solid rgba(13,148,136,.3); border-radius: 8px;
+  padding: .3rem .65rem; display: flex; align-items: center; gap: .4rem;
+  font-family: monospace; font-size: .65rem; color: #0d9488;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+.pulse-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: #0d9488;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13,148,136,.4); }
+  50% { box-shadow: 0 0 0 5px rgba(13,148,136,0); }
+}
+
+.algo-badge {
+  position: absolute; top: .75rem; left: .75rem; z-index: 1000;
+  background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
+  border: 1px solid rgba(0,0,0,.1); border-radius: 8px;
+  padding: .3rem .65rem; font-family: monospace; font-size: .65rem; color: #64748b;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+/* Leaflet dark fix */
+:global(.leaflet-container) { background: #f8fafc !important; }
+
+/* Route sheet */
+.route-sheet {
+  background: var(--surface-elevated);
+  border-top: 1px solid var(--border-light);
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 60%;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.08);
+  z-index: 10;
+}
+
+.sheet-handle {
+  width: 36px; height: 4px; background: rgba(0,0,0,.1); border-radius: 99px;
+  margin: .6rem auto .3rem;
+}
+:global(.dark) .sheet-handle { background: rgba(255,255,255,.15); }
+
+.sheet-top {
+  padding: .5rem 1rem .75rem; border-bottom: 1px solid var(--border-light);
+}
+
+.sheet-title-row {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: .6rem;
+}
+
+.sheet-title { font-size: 1rem; font-weight: 800; color: var(--text-primary); }
+
+/* Stats */
+.route-stats {
+  display: grid; grid-template-columns: repeat(4,1fr); gap: .4rem;
+}
+.hidden { display: none !important; }
+.rstat {
+  background: rgba(0,0,0,.04); border: 1px solid var(--border-light);
+  border-radius: 8px; padding: .5rem .6rem; text-align: center;
+}
+:global(.dark) .rstat { background: rgba(255,255,255,.05); }
+.rstat-v { font-family: monospace; font-size: 1rem; font-weight: 700; color: var(--color-teal); }
+.rstat-l { font-size: .58rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-tertiary); margin-top: 1px; }
+
+/* Next stop */
+.next-stop {
+  display: flex; align-items: center; gap: .65rem;
+  padding: .7rem 1rem; border-bottom: 1px solid var(--border-light);
+  background: linear-gradient(135deg, rgba(13,148,136,.06), rgba(8,145,178,.04));
+}
+.next-icon { font-size: 1.3rem; flex-shrink: 0; }
+.next-info { flex: 1; min-width: 0; }
+.next-label { font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--color-teal); margin: 0; }
+.next-addr { font-size: .85rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0; }
+.next-actions { display: flex; flex-direction: column; gap: .25rem; flex-shrink: 0; }
+
+/* Route list */
+.sheet-list {
+  flex: 1; overflow-y: auto; padding: .5rem .75rem;
+}
+
+.route-item {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .5rem .4rem; border-radius: 8px; cursor: pointer;
+  transition: background .15s;
+}
+.route-item:hover { background: rgba(0,0,0,.04); }
+:global(.dark) .route-item:hover { background: rgba(255,255,255,.04); }
+.ri-num {
+  width: 24px; height: 24px; border-radius: 6px; flex-shrink: 0;
+  background: rgba(13,148,136,.1); border: 1px solid rgba(13,148,136,.25);
+  display: grid; place-items: center; font-family: monospace; font-size: .7rem; font-weight: 700; color: var(--color-teal);
+}
+.ri-addr { flex: 1; font-size: .82rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ri-dist { font-family: monospace; font-size: .68rem; color: var(--text-tertiary); flex-shrink: 0; }
+.badge-done { font-size: .7rem; color: #16a34a; font-weight: 700; }
+
+/* Sheet footer */
+.sheet-footer {
+  display: flex; gap: .4rem; padding: .65rem 1rem;
+  border-top: 1px solid var(--border-light);
+}
+.flex-1 { flex: 1; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .5rem 1rem; border-radius: 8px; border: none; cursor: pointer;
+  font-size: .85rem; font-weight: 700; text-decoration: none;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--gradient-primary); color: white; }
+.btn-ghost { background: rgba(0,0,0,.04); color: var(--text-secondary); border: 1px solid var(--border-light); }
+:global(.dark) .btn-ghost { background: rgba(255,255,255,.05); }
+.btn-sm { padding: .32rem .75rem; font-size: .78rem; }
+.btn-xs { padding: .22rem .55rem; font-size: .7rem; border: 1px solid rgba(22,163,74,.3); background: rgba(22,163,74,.1); color: #16a34a; border-radius: 6px; cursor: pointer; font-weight: 700; }
+.btn[disabled] { opacity: .35; pointer-events: none; }
+
+/* Loader */
+.loader { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.25); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.5rem 1rem; text-align: center; }
+.empty-icon { font-size: 2rem; margin: 0; filter: grayscale(.4); }
+.empty-title { font-size: .85rem; font-weight: 700; color: var(--text-secondary); margin: 0; }
+.empty-desc { font-size: .78rem; color: var(--text-tertiary); margin: 0; }
+.link { color: var(--color-teal); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+</style>

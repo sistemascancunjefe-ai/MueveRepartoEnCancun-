@@ -1,0 +1,228 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+
+const title = "Enviar";
+---
+
+<MainLayout title={title}>
+  <div class="page">
+
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Notificaciones</h1>
+        <p class="page-sub">Envia tu ubicacion a destinatarios</p>
+      </div>
+    </div>
+
+    <!-- Channels -->
+    <div class="card">
+      <p class="card-label">Canales disponibles</p>
+      <div class="channels">
+        <div class="channel ch-wa">
+          <span class="ch-icon">💬</span>
+          <span class="ch-name">WhatsApp</span>
+        </div>
+        <div class="channel ch-tg">
+          <span class="ch-icon">✈️</span>
+          <span class="ch-name">Telegram</span>
+        </div>
+        <div class="channel ch-copy">
+          <span class="ch-icon">🔗</span>
+          <span class="ch-name">Copiar link</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stops with phone -->
+    <div id="send-list">
+      <div class="empty-state">
+        <p class="empty-icon">📤</p>
+        <p class="empty-title">Sin destinatarios</p>
+        <p class="empty-desc">Agrega telefono a tus paradas para notificar</p>
+      </div>
+    </div>
+
+    <!-- Tracking link generator -->
+    <div class="card">
+      <p class="card-label">Generar link de seguimiento</p>
+      <p class="card-desc">Comparte tu ubicacion en tiempo real con el destinatario durante la entrega</p>
+      <button class="btn btn-primary btn-full" id="btn-gen-link">Generar link de entrega</button>
+      <div class="track-link hidden" id="track-link-result">
+        <p class="track-link-label">Link generado:</p>
+        <div class="track-link-row">
+          <input class="inp inp-mono" id="track-link-url" readonly type="text" value="" />
+          <button class="btn btn-ghost btn-sm" id="btn-copy-track">Copiar</button>
+        </div>
+        <div class="track-ctas">
+          <a href="#" class="btn btn-wa btn-sm" id="btn-wa-track">💬 WhatsApp</a>
+          <a href="#" class="btn btn-tg btn-sm" id="btn-tg-track">✈️ Telegram</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</MainLayout>
+
+<script>
+const STORE_KEY = 'mr_stops';
+
+function getStops(): any[] {
+  try { return JSON.parse(sessionStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+}
+
+function render() {
+  const stops = getStops().filter((s: any) => s.phone && s.status !== 'delivered');
+  const container = document.getElementById('send-list') as HTMLElement;
+
+  if (stops.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p class="empty-icon">📤</p><p class="empty-title">Sin destinatarios</p><p class="empty-desc">Agrega telefono a tus paradas en la seccion <a href="/pedidos" class="link">Paradas</a></p></div>`;
+    return;
+  }
+
+  container.innerHTML = stops.map((s: any) => `
+    <div class="send-card">
+      <div class="send-icon">${{ urgent: '🔴', extra: '🟣' }[s.priority as string] || '📦'}</div>
+      <div class="send-info">
+        <p class="send-addr">${s.address.slice(0, 45)}${s.address.length > 45 ? '...' : ''}</p>
+        <p class="send-phone">📱 ${s.phone}</p>
+      </div>
+      <div class="send-btns">
+        <button class="btn btn-ghost btn-xs wa-btn" data-id="${s.id}" title="WhatsApp">💬</button>
+        <button class="btn btn-ghost btn-xs tg-btn" data-id="${s.id}" title="Telegram">✈️</button>
+        <button class="btn btn-ghost btn-xs cp-btn" data-id="${s.id}" title="Copiar link">🔗</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Wire buttons
+  container.querySelectorAll('.wa-btn').forEach(btn => btn.addEventListener('click', () => openWA((btn as HTMLElement).dataset.id!)));
+  container.querySelectorAll('.tg-btn').forEach(btn => btn.addEventListener('click', () => openTG((btn as HTMLElement).dataset.id!)));
+  container.querySelectorAll('.cp-btn').forEach(btn => btn.addEventListener('click', () => copyLink((btn as HTMLElement).dataset.id!)));
+}
+
+function openWA(id: string) {
+  const s = getStops().find((x: any) => x.id === id);
+  if (!s) return;
+  const msg = encodeURIComponent(
+    `📦 *Tu pedido esta en camino* 🛵\n📍 Direccion: ${s.address}${s.ref ? '\n📎 Ref: ' + s.ref : ''}\n🔗 Tracking: muevereparto.mx/track/${s.token}`
+  );
+  window.open(`https://wa.me/${s.phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+}
+
+function openTG(id: string) {
+  const s = getStops().find((x: any) => x.id === id);
+  if (!s) return;
+  const msg = encodeURIComponent(`📦 Tu pedido en camino! 🛵\n${s.address}\nTracking: muevereparto.mx/track/${s.token}`);
+  window.open(`https://t.me/share/url?url=muevereparto.mx/track/${s.token}&text=${msg}`, '_blank');
+}
+
+function copyLink(id: string) {
+  const s = getStops().find((x: any) => x.id === id);
+  if (!s) return;
+  const link = `https://muevereparto.mx/track/${s.token}`;
+  navigator.clipboard?.writeText(link).then(() => window.showToast?.('🔗 Link copiado', 'success'));
+}
+
+function generateTrackLink() {
+  const token = [...crypto.getRandomValues(new Uint8Array(6))].map(b => b.toString(16).padStart(2,'0')).join('');
+  const url = `https://muevereparto.mx/track/${token}`;
+  const resultEl = document.getElementById('track-link-result') as HTMLElement;
+  (document.getElementById('track-link-url') as HTMLInputElement).value = url;
+  resultEl.classList.remove('hidden');
+
+  const waMsg = encodeURIComponent(`🛵 Sigue mi entrega en tiempo real:\n${url}`);
+  (document.getElementById('btn-wa-track') as HTMLAnchorElement).href = `https://wa.me/?text=${waMsg}`;
+  (document.getElementById('btn-tg-track') as HTMLAnchorElement).href = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=Sigue+mi+entrega`;
+}
+
+function init() {
+  render();
+  document.getElementById('btn-gen-link')?.addEventListener('click', generateTrackLink);
+  document.getElementById('btn-copy-track')?.addEventListener('click', () => {
+    const url = (document.getElementById('track-link-url') as HTMLInputElement).value;
+    navigator.clipboard?.writeText(url).then(() => window.showToast?.('🔗 Link copiado', 'success'));
+  });
+}
+
+document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+.page {
+  display: flex; flex-direction: column; gap: 1rem;
+  padding: 1rem; max-width: 480px; margin: 0 auto;
+}
+
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; }
+.page-title { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.page-sub { font-size: .78rem; color: var(--text-tertiary); margin: .15rem 0 0; }
+
+/* Cards */
+.card { background: var(--surface-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .75rem; }
+.card-label { font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-tertiary); margin: 0; }
+.card-desc { font-size: .82rem; color: var(--text-secondary); margin: 0; }
+
+/* Channels */
+.channels { display: grid; grid-template-columns: repeat(3,1fr); gap: .5rem; }
+.channel { display: flex; flex-direction: column; align-items: center; gap: .3rem; padding: .65rem; border-radius: var(--radius-md); border: 1px solid var(--border-light); }
+.ch-icon { font-size: 1.4rem; }
+.ch-name { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.ch-wa { border-color: rgba(37,211,102,.2); background: rgba(37,211,102,.06); }
+.ch-wa .ch-name { color: #16a34a; }
+.ch-tg { border-color: rgba(0,136,204,.2); background: rgba(0,136,204,.06); }
+.ch-tg .ch-name { color: #0284c7; }
+.ch-copy { border-color: rgba(13,148,136,.2); background: rgba(13,148,136,.06); }
+.ch-copy .ch-name { color: var(--color-teal); }
+
+/* Send cards */
+.send-card {
+  display: flex; align-items: center; gap: .7rem;
+  background: var(--surface-card); border: 1px solid var(--border-light);
+  border-radius: var(--radius-md); padding: .8rem; margin-bottom: .45rem;
+}
+.send-icon { font-size: 1.3rem; flex-shrink: 0; }
+.send-info { flex: 1; min-width: 0; }
+.send-addr { font-size: .85rem; font-weight: 700; color: var(--text-primary); margin: 0 0 .15rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.send-phone { font-size: .75rem; color: var(--text-tertiary); margin: 0; }
+.send-btns { display: flex; gap: .25rem; flex-shrink: 0; }
+
+/* Tracking link */
+.track-link { display: flex; flex-direction: column; gap: .6rem; }
+.track-link-label { font-size: .72rem; font-weight: 700; color: var(--text-tertiary); margin: 0; }
+.track-link-row { display: flex; gap: .4rem; }
+.track-ctas { display: flex; gap: .4rem; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .5rem 1rem; border-radius: var(--radius-md); border: none; cursor: pointer;
+  font-size: .88rem; font-weight: 700; text-decoration: none;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 4px 14px rgba(13,148,136,.25); }
+.btn-ghost { background: rgba(0,0,0,.04); color: var(--text-secondary); border: 1px solid var(--border-light); }
+:global(.dark) .btn-ghost { background: rgba(255,255,255,.05); }
+.btn-full { width: 100%; }
+.btn-sm { padding: .35rem .75rem; font-size: .8rem; }
+.btn-xs { padding: .22rem .55rem; font-size: .82rem; border: 1px solid var(--border-light); background: rgba(0,0,0,.03); border-radius: 6px; cursor: pointer; font-weight: 700; }
+:global(.dark) .btn-xs { background: rgba(255,255,255,.04); }
+.btn-wa { background: #25D366; color: white; border: none; flex: 1; }
+.btn-tg { background: #0088CC; color: white; border: none; flex: 1; }
+
+/* Inputs */
+.inp { background: rgba(0,0,0,.04); border: 1.5px solid var(--border-light); border-radius: var(--radius-md); padding: .55rem .8rem; color: var(--text-primary); font-size: .88rem; width: 100%; outline: none; transition: border-color .15s; font-family: inherit; }
+:global(.dark) .inp { background: rgba(255,255,255,.05); }
+.inp:focus { border-color: var(--color-teal); }
+.inp-mono { font-family: monospace; font-size: .75rem; }
+
+.hidden { display: none !important; }
+
+/* Empty state */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 2.5rem 1rem; text-align: center; }
+.empty-icon { font-size: 2.5rem; filter: grayscale(.4); margin: 0; }
+.empty-title { font-size: .9rem; font-weight: 700; color: var(--text-secondary); margin: 0; }
+.empty-desc { font-size: .8rem; color: var(--text-tertiary); margin: 0; }
+.link { color: var(--color-teal); text-decoration: none; }
+.link:hover { text-decoration: underline; }
+</style>

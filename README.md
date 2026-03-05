@@ -1,160 +1,126 @@
-# 🏛️ MueveCancun: La Verdad de la Calle (Nexus Prime v3.2)
+# Mueve Reparto
 
-> "MueveCancun no nació en una oficina, nació en la parada del camión."
+> "Tu ruta. Tu tiempo. Tu ingreso."
 
-## 📍 El Problema: Google Maps no entiende a Cancún
-
-En nuestra ciudad, el transporte público es un organismo vivo que cambia más rápido que los algoritmos de las grandes plataformas. Un aviso en Facebook, un bloqueo repentino o una nueva ruta informal son la **"verdad de la calle"** que Google Maps ignora.
-
-MueveCancun es simple: **Funciona sin internet**, es ultrarrápida y está diseñada para que cualquier persona sepa exactamente qué ruta la lleva a su destino.
+Aplicacion PWA para repartidores independientes de paqueteria (Mercado Libre, Amazon, paqueterias, pedidos de apps y e-commerce). Optimiza rutas de entrega en segundos usando algoritmos de clustering y TSP, comparte ubicacion en tiempo real por WhatsApp, y muestra metricas semanales de ingreso vs. costo de suscripcion.
 
 ---
 
-## 🏛️ La Arquitectura: El Protocolo Nexus (4 Capas)
+## El Problema: 30 paradas, sin orden, sin tiempo
 
-Esta arquitectura de alto rendimiento está dividida en 4 sistemas secuenciales que trabajan en conjunto para ofrecer una aplicación offline-first ultrarrápida.
+Un repartidor independiente recibe una lista de direcciones y tiene que descubrir el orden optimo por su cuenta. Cada minuto perdido es ingreso perdido. Mueve Reparto resuelve eso en el dispositivo, sin internet, en menos de un segundo.
 
-### 1. Capa de Datos: Origen de Rutas
-- **Función**: Catálogo base que contiene "Señales Sociales" (alertas de tráfico, bloqueos, avisos de madrugada) y la información de todas las rutas.
-- **Ubicación**: `public/data/master_routes.json` con estructura validada para el motor WASM.
+---
 
-**Esquema JSON de master_routes.json:**
-```json
-{
-  "metadata": {
-    "last_updated": "ISO 8601 timestamp",
-    "source": "Nexus Listener v1.0",
-    "version": "3.2.0"
-  },
-  "social_alerts": ["Alerta global 1", "Alerta global 2"],
-  "routes": [
-    {
-      "id": "R2_94_VILLAS_OTOCH_001",
-      "nombre": "R-2-94 Villas Otoch (Eje Kabah - ZH)",
-      "tarifa": 15,
-      "moneda": "MXN",
-      "hub_conexion": "Plaza Las Américas / Chedraui Lakin",
-      "frecuencia_minutos": 10,
-      "horario": {
-        "inicio_oficial": "05:00",
-        "fin_oficial": "22:30",
-        "guardia_nocturna": "03:00 - 05:00"
-      },
-      "social_alerts": ["Aviso de madrugada", "Información de campo"],
-      "paradas": [
-        {
-          "nombre": "OXXO Villas Otoch",
-          "lat": 21.1685,
-          "lng": -86.885,
-          "orden": 1,
-          "tipo": "origen_madrugada",
-          "horario_salida_primer_turno": "03:55",
-          "advertencia": "Punto de agrupación"
-        }
-      ],
-      "tipo": "Bus_Urbano_Isla"
-    }
-  ]
-}
+## Caracteristicas Principales
+
+- **Optimizacion de ruta en cliente** — K-Means clustering + Nearest Neighbor + 2-opt directamente en el navegador. Sin backend, sin latencia de red.
+- **Multiples metodos de captura de paradas** — texto libre (geocodificacion local), link de Google Maps/Waze/OSM, GPS actual, importacion masiva linea por linea.
+- **Mapa interactivo** — Leaflet.js + OpenStreetMap con marcador de posicion del repartidor actualizado en tiempo real via `watchPosition`.
+- **Notificaciones por WhatsApp y Telegram** — mensaje preformateado con direccion y link de tracking por parada, con un toque.
+- **Metricas semanales** — pedidos, promedio diario, ingreso estimado ($13/pedido) y calculo de ROI vs. costo de suscripcion ($70/semana).
+- **Meta semanal** — barra de progreso con meta configurable guardada en localStorage.
+- **PWA offline-first** — Service Worker existente; funciona sin conexion una vez instalada.
+- **Dark/Light mode** — hereda el sistema de tokens CSS del proyecto base.
+
+---
+
+## Stack Tecnico
+
+| Capa | Tecnologia |
+|---|---|
+| Framework | Astro 4 (SSG + View Transitions) |
+| Lenguaje | TypeScript (client-side islands) |
+| Mapa | Leaflet 1.9.4 (CDN lazy-load) + OpenStreetMap |
+| Algoritmo | K-Means + Nearest Neighbor + 2-opt (TSP heuristico) |
+| Distancias | Formula de Haversine |
+| Estado | `sessionStorage` (`mr_stops`) + `localStorage` (metas) |
+| Estilos | CSS custom properties (tokens compartidos) |
+| PWA | Service Worker offline-first |
+
+---
+
+## Arquitectura de Paginas
+
+```
+/          — Splash screen con animacion de carga
+/home      — Dashboard: progreso del dia, metricas rapidas, proximas paradas
+/pedidos   — Gestion de paradas: agregar, filtrar, cambiar estado
+/reparto   — Mapa + optimizacion de ruta + "siguiente parada"
+/enviar    — Notificaciones WhatsApp/Telegram por parada
+/metricas  — Estadisticas semanales, grafica de barras, ROI, meta
 ```
 
-**Señales Sociales**: El sistema captura información de campo que Google Maps no ofrece: tarifas de madrugada, puntos de Guardia Nocturna, advertencias de letreros obligatorios, y estados actuales del tráfico.
+---
 
-### 2. Capa de Procesamiento: Motor Rust/WASM
-- **Core**: `rust-wasm/route-calculator/src/lib.rs`
-- **Compilación**: `scripts/build-wasm.mjs` (usa wasm-pack + binaryen para optimización).
-- **SpatialHash**: Estructura de índice espacial para búsquedas O(1) de rutas cercanas.
-- **RouteCalculator**: Algoritmo que encuentra la mejor ruta considerando distancia, frecuencia y transbordos.
-- **Ruta Crítica**: El binario WASM se sirve desde `/wasm/route-calculator/route_calculator.js`.
-- **Seguridad**: Hardening contra DoS con Circuit Breaker de 2M ops máximo por request.
+## Algoritmo de Optimizacion
 
-### 3. Capa de Presentación: Astro SSG
-- **UI**: Componentes `.astro` sin framework JS pesado (Vanilla JS para interactividad).
-- **Estilos**: `src/styles/global.css` y `src/index.css` con CSS Variables + Grid + Flexbox.
-- **Diseño Responsive**: Optimizado para Dark/Light mode y navegación inferior fija (mobile-first).
-- **PWA Offline**: Service Worker para funcionamiento sin conexión.
-- **defaultLang**: 'es' (español) como idioma predeterminado.
+```
+optimizeNexus(stops, origin):
+  1. K-Means clustering  (k = ceil(n/8), max 4 clusters)
+  2. Ordenar clusters por distancia al origen (Haversine)
+  3. Por cada cluster:
+       a. Nearest Neighbor greedy desde el ultimo punto visitado
+       b. 2-opt mejora (max 100 iteraciones)
+  4. Concatenar clusters → ruta final ordenada
+  5. Calcular distancia total (km) y tiempo estimado (min)
+```
 
-### 4. Capa de Persistencia: IndexedDB
-- **db.ts**: Gestiona el balance de usuario en IndexedDB (migración automática desde localStorage).
-- **Stores en src/lib/**:
-  - `SpatialHash.ts`: Índice espacial para rutas
-  - `FavoritesStore.ts`: Rutas favoritas persistidas
-  - `CoordinatesStore.ts`: Coordenadas del usuario
-- **Estrategia**: Offline-first con sincronización cuando hay conexión.
+La combinacion de clustering + NN + 2-opt produce rutas dentro del 5-15% del optimo en < 50 ms para n <= 50 paradas.
 
 ---
 
-## 🤖 CI / Automatización
+## Captura de Paradas
 
-- El flujo manual `Delegate to Claude (unscoped tasks)` requiere el secreto `ANTHROPIC_API_KEY`.
-- Ejecútalo sólo en ramas no protegidas; las acciones deben crear cambios vía rama/PR, no push directo a `main`.
+El modal de nueva parada soporta 4 modos:
+
+| Modo | Descripcion |
+|---|---|
+| Texto | Direccion libre; geocodificacion local con patrones de Cancun (SM, MZ, etc.) |
+| Link | Parseo de URLs: Google Maps `@lat,lng`, `?q=`, `ll=`, Waze, OSM `#map=`, geo: URI |
+| GPS | `navigator.geolocation.getCurrentPosition` con fallback a coordenadas demo |
+| Masivo | Importacion de multiples paradas (una por linea) con deteccion automatica de links |
 
 ---
 
-## 🛠️ Troubleshooting & Interconexión
+## Modelo de Negocio
 
-Si el sistema falla, sigue esta guía de diagnóstico por capas (Protocolo Nexus):
+- **Trial**: 30 dias gratis al instalar
+- **Suscripcion**: $70 MXN/semana
+- **Break-even**: 1 pedido extra por dia (~$13 ingreso adicional) cubre el costo
+- **ROI tipico escenario +15%**: > 200% sobre el costo de la app
 
-### 🔴 Capa 1: Error en los Datos Base
-1. **Schema Check**: Confirma que `public/data/master_routes.json` tenga las claves `routes`, `social_alerts` y `metadata`.
-2. **Validar JSON**: Asegúrate de que el archivo no tenga errores de sintaxis.
+---
 
-### 🟡 Capa 2: Error en Motor WASM (Procesamiento)
-1. **Verificar WASM**: Revisa que `public/wasm/route-calculator/route_calculator_bg.wasm` exista y tenga tamaño >0.
-2. **Path Audit**: Confirma que `RouteCalculator.astro` importa desde `/wasm/...`.
-3. **Recompilar**: Ejecuta `node scripts/build-wasm.mjs`.
-4. **Logs del navegador**: Revisa la consola para errores de WebAssembly.
+## Desarrollo Local
 
-### 🔵 Capa 3: Error en Frontend (Presentación)
-1. **CSS Audit**: Revisa que los componentes usen clases compatibles con Dark Mode (ej. `dark:text-slate-100`).
-2. **Z-Index**: La barra de navegación (`z-50`) no debe cubrir el contenido (`pb-24` en `MainLayout`).
-3. **PWA**: Verifica que el Service Worker esté registrado en `src/pages/_offline.astro`.
-
-### 🟢 Capa 4: Error en IndexedDB (Persistencia)
-1. **Console DB**: Revisa errores en la consola del navegador relacionados con `db.ts`.
-2. **Migración localStorage**: Verifica que la migración automática desde localStorage funcione.
-3. **Storage quota**: Asegúrate de que el navegador tenga espacio disponible para IndexedDB.
-
-### ⚡ Comandos de Diagnóstico Rápido
 ```bash
-# Verificar estructura de datos
-python3 -c "import json; print(json.load(open('public/data/master_routes.json')).keys())"
+# Instalar dependencias
+pnpm install
 
-# Verificar compilación WASM
-ls -la public/wasm/route-calculator/
+# Servidor de desarrollo
+pnpm run dev
 
-# Verificar stores de persistencia
-ls -la src/lib/
+# Build de produccion
+pnpm run build
 ```
 
 ---
 
-## 📦 Comandos de Desarrollo
+## Estado de Paradas
 
-1. **Instalar dependencias**:
-   ```bash
-   pnpm install
-   ```
-
-2. **Datos Maestros**:
-   Los datos se encuentran en `public/data/master_routes.json` y se pueden modificar directamente.
-
-3. **Compilar Motor WASM**:
-   ```bash
-   node scripts/build-wasm.mjs
-   ```
-
-4. **Iniciar Servidor Local**:
-   ```bash
-   pnpm run dev
-   ```
+| Estado | Color | Descripcion |
+|---|---|---|
+| `pending` | Gris | Sin iniciar |
+| `in_route` | Teal | En camino actualmente |
+| `delivered` | Verde | Entregado con exito |
+| `failed` | Rojo | Intento fallido |
 
 ---
 
-## 👤 Créditos
+## Creditos
 
-**Julián Alexander Juárez Alvarado**
+**Julian Alexander Juarez Alvarado**
 _Lead Architect & Full Stack Data Engineer_
 
-> "La eficiencia no es un lujo técnico, es un imperativo moral."
+> "La eficiencia no es un lujo tecnico, es un imperativo moral."

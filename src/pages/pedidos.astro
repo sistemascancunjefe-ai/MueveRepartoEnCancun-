@@ -1,0 +1,709 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+
+const title = "Paradas";
+---
+
+<MainLayout title={title}>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">Mis Paradas</h1>
+        <p class="page-sub" id="stops-subtitle">0 paradas hoy</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-ghost btn-sm" id="btn-clear-done">Limpiar ✓</button>
+        <button class="btn btn-primary btn-sm" id="btn-open-add">+ Nueva</button>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-f="all">Todas</button>
+      <button class="chip" data-f="urgent">Urgentes</button>
+      <button class="chip" data-f="pending">Pendientes</button>
+      <button class="chip" data-f="done">Entregadas</button>
+    </div>
+
+    <!-- Stops list -->
+    <div id="stops-list" class="stops-list"></div>
+
+    <!-- Footer optimize CTA -->
+    <div class="card card-coral hidden" id="footer-cta">
+      <div class="cta-row">
+        <div>
+          <p class="cta-label"><span id="footer-count">0</span> PENDIENTES</p>
+          <p class="cta-desc">Calcula la ruta optima &rarr;</p>
+        </div>
+        <a href="/reparto" class="btn btn-coral btn-sm">Optimizar</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Add Stop Modal -->
+  <div class="overlay hidden" id="add-overlay"></div>
+  <div class="sheet hidden" id="add-sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-header">
+      <h2 class="sheet-title">+ Agregar parada</h2>
+      <button class="sheet-close" id="btn-close-add" aria-label="Cerrar">&#10005;</button>
+    </div>
+
+    <!-- Priority -->
+    <div class="sheet-body">
+      <div class="field">
+        <label class="field-label">Prioridad</label>
+        <div class="pri-group">
+          <button class="pri-btn" data-p="urgent">Urgente</button>
+          <button class="pri-btn selected" data-p="normal">Normal</button>
+          <button class="pri-btn" data-p="extra">Extra</button>
+        </div>
+      </div>
+
+      <!-- Method tabs -->
+      <div class="method-tabs">
+        <button class="mtab active" data-m="text">Escribir</button>
+        <button class="mtab" data-m="link">Enlace</button>
+        <button class="mtab" data-m="gps">GPS</button>
+        <button class="mtab" data-m="companion">Companero</button>
+      </div>
+
+      <!-- Panel: Text -->
+      <div class="mpanel active" id="mp-text">
+        <div class="field">
+          <label class="field-label" for="inp-addr">Direccion *</label>
+          <input class="inp" id="inp-addr" type="text" placeholder="SM 23, Mza 5, Cancun Q.R." />
+          <div class="geo-result hidden" id="geo-result"></div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="inp-ref">Referencia</label>
+          <input class="inp" id="inp-ref" type="text" placeholder="Casa azul, frente al Oxxo..." />
+        </div>
+        <div class="field">
+          <label class="field-label" for="inp-phone">Tel. destinatario (WhatsApp)</label>
+          <input class="inp" id="inp-phone" type="tel" placeholder="998 123 4567" />
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-add-text">
+          <span id="add-text-label">+ Agregar parada</span>
+          <span class="loader hidden" id="add-text-loader"></span>
+        </button>
+      </div>
+
+      <!-- Panel: Link -->
+      <div class="mpanel hidden" id="mp-link">
+        <div class="field">
+          <label class="field-label" for="inp-link">Enlace de Google Maps, Waze, OSM...</label>
+          <input class="inp" id="inp-link" type="url" placeholder="https://maps.google.com/..." />
+          <div class="geo-result hidden" id="link-result"></div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="inp-link-addr">Nombre del lugar</label>
+          <input class="inp" id="inp-link-addr" type="text" placeholder="Ej: Casa del cliente" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="inp-link-phone">Tel. destinatario</label>
+          <input class="inp" id="inp-link-phone" type="tel" placeholder="998 123 4567" />
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-add-link" disabled>+ Agregar desde enlace</button>
+      </div>
+
+      <!-- Panel: GPS -->
+      <div class="mpanel hidden" id="mp-gps">
+        <div class="gps-card">
+          <p class="gps-emoji">📍</p>
+          <p class="gps-title">Usar mi ubicacion actual</p>
+          <p class="gps-desc">Agrega el punto donde estas ahora como parada de entrega</p>
+          <p class="gps-coords hidden" id="gps-coords"></p>
+          <button class="btn btn-primary" id="btn-capture-gps">Capturar GPS</button>
+        </div>
+        <div class="field">
+          <label class="field-label" for="inp-gps-addr">Nombre del lugar</label>
+          <input class="inp" id="inp-gps-addr" type="text" placeholder="Opcional" />
+        </div>
+        <button class="btn btn-primary btn-full hidden" id="btn-add-gps">+ Agregar ubicacion GPS</button>
+      </div>
+
+      <!-- Panel: Companion -->
+      <div class="mpanel hidden" id="mp-companion">
+        <p class="comp-hint">Pega direcciones de un companero (una por linea). Se marcan como <strong>Extra</strong>.</p>
+        <div class="field">
+          <label class="field-label" for="inp-companion">Direcciones / enlaces</label>
+          <textarea class="inp" id="inp-companion" rows="5"
+            placeholder="SM 23 Mza 5 Cancun&#10;https://maps.google.com/...&#10;Av. Tulum 280, Cancun"></textarea>
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-add-companion">
+          <span id="comp-label">Importar todas</span>
+          <span class="loader hidden" id="comp-loader"></span>
+        </button>
+        <p class="comp-preview hidden" id="comp-preview"></p>
+      </div>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+const STORE_KEY = 'mr_stops';
+
+function uid(n = 12) {
+  return [...crypto.getRandomValues(new Uint8Array(n))]
+    .map(b => b.toString(16).padStart(2, '0')).join('').slice(0, n);
+}
+
+function getStops(): any[] {
+  try { return JSON.parse(sessionStorage.getItem(STORE_KEY) || '[]'); } catch { return []; }
+}
+
+function saveStops(stops: any[]) {
+  sessionStorage.setItem(STORE_KEY, JSON.stringify(stops));
+}
+
+// Geocode quick-match for Cancun
+const CAN_LOCS: [RegExp, number, number][] = [
+  [/sm.?23/i, 21.1711, -86.8487], [/sm.?57/i, 21.1549, -86.8522],
+  [/sm.?64/i, 21.1602, -86.8609], [/sm.?35/i, 21.1488, -86.8444],
+  [/sm.?4\b/i, 21.1620, -86.8480], [/tulum/i, 21.1634, -86.8372],
+  [/kabah/i, 21.1488, -86.8444], [/kukulc/i, 21.1326, -86.7854],
+];
+
+function quickGeocode(addr: string): { lat: number; lng: number } {
+  for (const [re, lat, lng] of CAN_LOCS) {
+    if (re.test(addr)) return { lat: lat + (Math.random() - .5) * .003, lng: lng + (Math.random() - .5) * .003 };
+  }
+  return { lat: 21.08 + Math.random() * .12, lng: -86.90 + Math.random() * .15 };
+}
+
+// Parse map URLs
+function parseMapUrl(raw: string): { lat: number; lng: number } | null {
+  const url = raw.trim();
+  const patterns = [
+    url.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/),
+    url.match(/[?&]q=(-?\d+\.?\d+),(-?\d+\.?\d+)/),
+    url.match(/ll=(-?\d+\.?\d+),(-?\d+\.?\d+)/),
+    url.match(/latlng=(-?\d+\.?\d+),(-?\d+\.?\d+)/),
+    url.match(/#map=\d+\/(-?\d+\.?\d+)\/(-?\d+\.?\d+)/),
+    url.match(/(-?\d{1,3}\.\d{4,})[,\s]+(-?\d{1,3}\.\d{4,})/),
+  ];
+  for (const m of patterns) {
+    if (m) {
+      const lat = +m[1], lng = +m[2];
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) return { lat, lng };
+    }
+  }
+  return null;
+}
+
+// ── Filter state ─────────────────────────────────────────────────────
+let activeFilter = 'all';
+let currentPriority = 'normal';
+let gpsCoords: { lat: number; lng: number } | null = null;
+let linkCoords: { lat: number; lng: number } | null = null;
+
+// ── Render ─────────────────────────────────────────────────────────
+function render() {
+  const stops = getStops();
+  let list = stops;
+  if (activeFilter === 'urgent')  list = stops.filter((s: any) => s.priority === 'urgent');
+  if (activeFilter === 'pending') list = stops.filter((s: any) => s.status === 'pending' || s.status === 'in_route');
+  if (activeFilter === 'done')    list = stops.filter((s: any) => s.status === 'delivered');
+  list = [...list].sort((a: any, b: any) => (b.priority === 'urgent' ? 1 : 0) - (a.priority === 'urgent' ? 1 : 0));
+
+  const pending = stops.filter((s: any) => s.status === 'pending' || s.status === 'in_route').length;
+  (document.getElementById('stops-subtitle') as HTMLElement).textContent = `${stops.length} paradas · ${pending} pendientes`;
+  (document.getElementById('footer-count') as HTMLElement).textContent = String(pending);
+
+  const footerCta = document.getElementById('footer-cta') as HTMLElement;
+  footerCta.classList.toggle('hidden', pending < 2);
+
+  const container = document.getElementById('stops-list') as HTMLElement;
+  if (list.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p class="empty-icon">📭</p><p class="empty-title">Sin paradas</p><p class="empty-desc">${activeFilter === 'all' ? 'Agrega tu primer pedido' : 'Sin resultados'}</p>${activeFilter === 'all' ? '<button class="btn btn-primary btn-sm" id="empty-add-btn" style="margin-top:.5rem">+ Agregar</button>' : ''}</div>`;
+    document.getElementById('empty-add-btn')?.addEventListener('click', openAdd);
+    return;
+  }
+  container.innerHTML = list.map((s: any, i: number) => stopHTML(s, i)).join('');
+  // Wire action buttons
+  container.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const el = e.currentTarget as HTMLElement;
+      const action = el.dataset.action!;
+      const id = el.dataset.id!;
+      if (action === 'route') setStatus(id, 'in_route');
+      if (action === 'done')  setStatus(id, 'delivered');
+      if (action === 'fail')  setStatus(id, 'failed');
+      if (action === 'del')   removeStop(id);
+      if (action === 'wa')    openWA(id);
+    });
+  });
+}
+
+function stopHTML(s: any, i: number) {
+  const priColor = s.priority === 'urgent' ? '#ef4444' : s.priority === 'extra' ? '#8b5cf6' : '#0d9488';
+  const stLabel  = ({ pending: 'Pendiente', in_route: 'En ruta', delivered: 'Entregado', failed: 'Fallido' } as any)[s.status] || s.status;
+  const stClass  = ({ pending: 'badge-dim', in_route: 'badge-teal', delivered: 'badge-green', failed: 'badge-red' } as any)[s.status] || 'badge-dim';
+  const isDone   = s.status === 'delivered';
+  const srcIcon  = ({ manual: '✍️', link: '🔗', gps: '📍', companion: '👥' } as any)[s.source] || '📦';
+
+  return `<div class="stop-card${isDone ? ' done' : ''}" style="--pri-color:${priColor}">
+    <div class="stop-seq">${s.seq || (i + 1)}</div>
+    <div class="stop-body">
+      <p class="stop-addr">${s.address}</p>
+      ${s.ref ? `<p class="stop-ref">📎 ${s.ref}</p>` : ''}
+      <div class="stop-meta">
+        <span class="badge ${stClass}">${stLabel}</span>
+        <span class="badge badge-dim">${srcIcon}</span>
+        ${s.phone ? `<span class="badge badge-dim">📱 ${s.phone}</span>` : ''}
+        ${s.lat ? `<span class="badge badge-teal">📡</span>` : ''}
+      </div>
+      ${!isDone ? `<div class="stop-actions">
+        ${s.status !== 'in_route' ? `<button class="btn btn-ghost btn-xs" data-action="route" data-id="${s.id}">En ruta</button>` : ''}
+        <button class="btn btn-xs btn-green" data-action="done" data-id="${s.id}">✓ Entregado</button>
+        <button class="btn btn-xs btn-red-ghost" data-action="fail" data-id="${s.id}">✗</button>
+        ${s.phone ? `<button class="btn btn-ghost btn-xs" data-action="wa" data-id="${s.id}">💬</button>` : ''}
+      </div>` : ''}
+    </div>
+    <button class="btn-icon" data-action="del" data-id="${s.id}" aria-label="Eliminar">✕</button>
+  </div>`;
+}
+
+function setStatus(id: string, status: string) {
+  const stops = getStops();
+  const s = stops.find((x: any) => x.id === id);
+  if (s) { s.status = status; if (status === 'delivered') s.deliveredAt = new Date().toISOString(); }
+  saveStops(stops);
+  render();
+  window.showToast?.(status === 'delivered' ? '✓ Entregado' : 'Estado actualizado', 'success');
+}
+
+function removeStop(id: string) {
+  saveStops(getStops().filter((s: any) => s.id !== id));
+  render();
+  window.showToast?.('Parada eliminada', 'info');
+}
+
+function openWA(id: string) {
+  const s = getStops().find((x: any) => x.id === id);
+  if (!s) return;
+  const msg = encodeURIComponent(`📦 *Tu pedido esta en camino* 🛵\n📍 ${s.address}${s.ref ? '\n📎 ' + s.ref : ''}\n🔗 muevereparto.mx/track/${s.token}`);
+  window.open(`https://wa.me/${s.phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+}
+
+// ── Add Stop Modal ────────────────────────────────────────────────
+function openAdd() {
+  document.getElementById('add-overlay')!.classList.remove('hidden');
+  document.getElementById('add-sheet')!.classList.remove('hidden');
+  resetAddForm();
+}
+
+function closeAdd() {
+  document.getElementById('add-overlay')!.classList.add('hidden');
+  document.getElementById('add-sheet')!.classList.add('hidden');
+}
+
+function resetAddForm() {
+  (document.getElementById('inp-addr') as HTMLInputElement).value = '';
+  (document.getElementById('inp-ref') as HTMLInputElement).value = '';
+  (document.getElementById('inp-phone') as HTMLInputElement).value = '';
+  (document.getElementById('inp-link') as HTMLInputElement).value = '';
+  (document.getElementById('inp-link-addr') as HTMLInputElement).value = '';
+  (document.getElementById('inp-link-phone') as HTMLInputElement).value = '';
+  (document.getElementById('inp-gps-addr') as HTMLInputElement).value = '';
+  (document.getElementById('inp-companion') as HTMLTextAreaElement).value = '';
+  document.getElementById('geo-result')!.classList.add('hidden');
+  document.getElementById('link-result')!.classList.add('hidden');
+  document.getElementById('gps-coords')!.classList.add('hidden');
+  document.getElementById('btn-add-gps')!.classList.add('hidden');
+  document.getElementById('comp-preview')!.classList.add('hidden');
+  linkCoords = null; gpsCoords = null;
+  currentPriority = 'normal';
+  selectPri('normal');
+  selectMethod('text');
+}
+
+function addStopToState(data: any) {
+  const stops = getStops();
+  stops.push({
+    id: uid(), address: data.address, lat: data.lat, lng: data.lng,
+    phone: data.phone || '', ref: data.ref || '', priority: data.priority || 'normal',
+    status: 'pending', source: data.source || 'manual', token: uid(8), seq: null,
+    addedAt: new Date().toISOString(),
+  });
+  saveStops(stops);
+}
+
+// ── Priority ──────────────────────────────────────────────────────
+function selectPri(p: string) {
+  currentPriority = p;
+  document.querySelectorAll('.pri-btn').forEach(b => {
+    b.classList.toggle('selected', (b as HTMLElement).dataset.p === p);
+  });
+}
+
+// ── Method tabs ───────────────────────────────────────────────────
+function selectMethod(m: string) {
+  document.querySelectorAll('.mtab').forEach(t => t.classList.toggle('active', (t as HTMLElement).dataset.m === m));
+  document.querySelectorAll('.mpanel').forEach(p => p.classList.toggle('active', p.id === `mp-${m}`));
+  document.querySelectorAll('.mpanel').forEach(p => p.classList.toggle('hidden', p.id !== `mp-${m}`));
+}
+
+// ── Geocode (text panel) ──────────────────────────────────────────
+async function doGeocode() {
+  const addr = (document.getElementById('inp-addr') as HTMLInputElement).value.trim();
+  const res = document.getElementById('geo-result') as HTMLElement;
+  if (addr.length < 4) { res.classList.add('hidden'); return; }
+  res.classList.remove('hidden');
+  res.className = 'geo-result geo-info';
+  res.textContent = 'Geocodificando...';
+  await new Promise(r => setTimeout(r, 500));
+  const coords = quickGeocode(addr);
+  linkCoords = coords;
+  res.className = 'geo-result geo-ok';
+  res.textContent = `✓ ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)} (OSM)`;
+}
+
+// ── Link parser ───────────────────────────────────────────────────
+function parseLink() {
+  const raw = (document.getElementById('inp-link') as HTMLInputElement).value.trim();
+  const res = document.getElementById('link-result') as HTMLElement;
+  const btn = document.getElementById('btn-add-link') as HTMLButtonElement;
+  linkCoords = null; btn.disabled = true;
+  if (!raw) { res.classList.add('hidden'); return; }
+  const coords = parseMapUrl(raw);
+  res.classList.remove('hidden');
+  if (coords) {
+    linkCoords = coords;
+    res.className = 'geo-result geo-ok';
+    res.textContent = `✓ ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    btn.disabled = false;
+  } else {
+    res.className = 'geo-result geo-fail';
+    res.textContent = '✗ No se detectaron coordenadas en el enlace';
+  }
+}
+
+// ── Commit stops ─────────────────────────────────────────────────
+async function commitText() {
+  const addr = (document.getElementById('inp-addr') as HTMLInputElement).value.trim();
+  if (!addr) { window.showToast?.('La direccion es requerida', 'error'); return; }
+  const btn = document.getElementById('btn-add-text') as HTMLButtonElement;
+  btn.disabled = true;
+  document.getElementById('add-text-label')!.classList.add('hidden');
+  document.getElementById('add-text-loader')!.classList.remove('hidden');
+  if (!linkCoords) await doGeocode();
+  await new Promise(r => setTimeout(r, 300));
+  addStopToState({
+    address: addr, lat: linkCoords?.lat, lng: linkCoords?.lng,
+    ref: (document.getElementById('inp-ref') as HTMLInputElement).value.trim(),
+    phone: (document.getElementById('inp-phone') as HTMLInputElement).value.trim(),
+    priority: currentPriority, source: 'manual',
+  });
+  btn.disabled = false;
+  document.getElementById('add-text-label')!.classList.remove('hidden');
+  document.getElementById('add-text-loader')!.classList.add('hidden');
+  render();
+  closeAdd();
+  window.showToast?.('📦 Parada agregada', 'success');
+}
+
+function commitLink() {
+  if (!linkCoords) { window.showToast?.('Sin coordenadas validas', 'error'); return; }
+  const addr = (document.getElementById('inp-link-addr') as HTMLInputElement).value.trim()
+    || `Parada ${linkCoords.lat.toFixed(4)}, ${linkCoords.lng.toFixed(4)}`;
+  addStopToState({
+    address: addr, lat: linkCoords.lat, lng: linkCoords.lng,
+    phone: (document.getElementById('inp-link-phone') as HTMLInputElement).value.trim(),
+    priority: currentPriority, source: 'link',
+  });
+  render(); closeAdd();
+  window.showToast?.('🔗 Parada agregada desde enlace', 'success');
+}
+
+function captureGPS() {
+  if (!navigator.geolocation) { window.showToast?.('GPS no disponible', 'error'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const el = document.getElementById('gps-coords') as HTMLElement;
+      el.classList.remove('hidden');
+      el.textContent = `📡 ${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lng.toFixed(5)} ±${Math.round(pos.coords.accuracy)}m`;
+      document.getElementById('btn-add-gps')!.classList.remove('hidden');
+      window.showToast?.('📍 Ubicacion capturada', 'success');
+    },
+    () => {
+      // Demo fallback
+      gpsCoords = { lat: 21.1619 + (Math.random() - .5) * .01, lng: -86.8515 + (Math.random() - .5) * .01 };
+      const el = document.getElementById('gps-coords') as HTMLElement;
+      el.classList.remove('hidden');
+      el.textContent = `📡 Demo: ${gpsCoords.lat.toFixed(5)}, ${gpsCoords.lng.toFixed(5)}`;
+      document.getElementById('btn-add-gps')!.classList.remove('hidden');
+    },
+    { enableHighAccuracy: true, timeout: 8000 }
+  );
+}
+
+function commitGPS() {
+  if (!gpsCoords) { window.showToast?.('Captura el GPS primero', 'error'); return; }
+  const addr = (document.getElementById('inp-gps-addr') as HTMLInputElement).value.trim()
+    || `Mi ubicacion ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)}`;
+  addStopToState({ address: addr, lat: gpsCoords.lat, lng: gpsCoords.lng, priority: currentPriority, source: 'gps' });
+  render(); closeAdd();
+  window.showToast?.('📍 Parada GPS agregada', 'success');
+}
+
+async function commitCompanion() {
+  const raw = (document.getElementById('inp-companion') as HTMLTextAreaElement).value.trim();
+  if (!raw) { window.showToast?.('Pega las direcciones primero', 'error'); return; }
+  const btn = document.getElementById('btn-add-companion') as HTMLButtonElement;
+  btn.disabled = true;
+  document.getElementById('comp-label')!.classList.add('hidden');
+  document.getElementById('comp-loader')!.classList.remove('hidden');
+  await new Promise(r => setTimeout(r, 400));
+
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 4);
+  let added = 0;
+  for (const line of lines) {
+    const coords = parseMapUrl(line) || quickGeocode(line);
+    addStopToState({ address: line.slice(0, 80), lat: coords.lat, lng: coords.lng, priority: 'extra', source: 'companion', ref: 'De companero' });
+    added++;
+  }
+
+  btn.disabled = false;
+  document.getElementById('comp-label')!.classList.remove('hidden');
+  document.getElementById('comp-loader')!.classList.add('hidden');
+  const preview = document.getElementById('comp-preview') as HTMLElement;
+  preview.classList.remove('hidden');
+  preview.textContent = `✓ ${added} paradas importadas como Extra`;
+  render();
+  setTimeout(closeAdd, 1200);
+  window.showToast?.(`👥 ${added} paradas importadas`, 'success');
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+function init() {
+  render();
+
+  // Check if add=1 in URL (from home CTA)
+  if (new URLSearchParams(window.location.search).get('add') === '1') openAdd();
+
+  // Filters
+  document.getElementById('filter-chips')?.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = (btn as HTMLElement).dataset.f!;
+      render();
+    });
+  });
+
+  // Clear done
+  document.getElementById('btn-clear-done')?.addEventListener('click', () => {
+    const stops = getStops();
+    const n = stops.filter((s: any) => s.status === 'delivered').length;
+    saveStops(stops.filter((s: any) => s.status !== 'delivered'));
+    render();
+    window.showToast?.(`${n} paradas archivadas`, 'info');
+  });
+
+  // Open/close add modal
+  document.getElementById('btn-open-add')?.addEventListener('click', openAdd);
+  document.getElementById('btn-close-add')?.addEventListener('click', closeAdd);
+  document.getElementById('add-overlay')?.addEventListener('click', closeAdd);
+
+  // Priority buttons
+  document.querySelectorAll('.pri-btn').forEach(btn => {
+    btn.addEventListener('click', () => selectPri((btn as HTMLElement).dataset.p!));
+  });
+
+  // Method tabs
+  document.querySelectorAll('.mtab').forEach(btn => {
+    btn.addEventListener('click', () => selectMethod((btn as HTMLElement).dataset.m!));
+  });
+
+  // Text panel
+  document.getElementById('inp-addr')?.addEventListener('blur', doGeocode);
+  document.getElementById('inp-addr')?.addEventListener('input', () => { linkCoords = null; document.getElementById('geo-result')?.classList.add('hidden'); });
+  document.getElementById('btn-add-text')?.addEventListener('click', commitText);
+
+  // Link panel
+  document.getElementById('inp-link')?.addEventListener('input', parseLink);
+  document.getElementById('btn-add-link')?.addEventListener('click', commitLink);
+
+  // GPS panel
+  document.getElementById('btn-capture-gps')?.addEventListener('click', captureGPS);
+  document.getElementById('btn-add-gps')?.addEventListener('click', commitGPS);
+
+  // Companion panel
+  document.getElementById('btn-add-companion')?.addEventListener('click', commitCompanion);
+}
+
+document.addEventListener('astro:page-load', init);
+</script>
+
+<style>
+.page {
+  display: flex; flex-direction: column; gap: .9rem;
+  padding: 1rem; max-width: 480px; margin: 0 auto;
+}
+
+.page-header { display: flex; align-items: flex-start; justify-content: space-between; }
+.page-title { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.page-sub { font-size: .78rem; color: var(--text-tertiary); margin: .15rem 0 0; }
+.header-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
+/* Filter chips */
+.filter-chips { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .15rem; scrollbar-width: none; }
+.filter-chips::-webkit-scrollbar { display: none; }
+.chip {
+  padding: .3rem .75rem; border-radius: 99px; border: 1.5px solid var(--border-light);
+  font-size: .72rem; font-weight: 700; color: var(--text-tertiary); cursor: pointer;
+  white-space: nowrap; background: none; transition: all .15s;
+}
+.chip.active { background: rgba(13,148,136,.1); border-color: rgba(13,148,136,.3); color: var(--color-teal); }
+
+/* Stops list */
+.stops-list { display: flex; flex-direction: column; gap: .4rem; }
+.stop-card {
+  display: flex; align-items: flex-start; gap: .65rem;
+  background: var(--surface-card); border: 1px solid var(--border-light);
+  border-radius: var(--radius-md); padding: .75rem;
+  border-left: 3px solid var(--pri-color, var(--color-teal));
+  transition: border-color .15s;
+}
+.stop-card.done { opacity: .45; }
+.stop-seq {
+  width: 32px; height: 32px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,.04); border: 1px solid var(--border-light);
+  font-family: monospace; font-size: .78rem; font-weight: 700; color: var(--text-secondary);
+}
+:global(.dark) .stop-seq { background: rgba(255,255,255,.06); }
+.stop-body { flex: 1; min-width: 0; }
+.stop-addr { font-size: .88rem; font-weight: 600; color: var(--text-primary); margin: 0 0 .2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stop-ref { font-size: .74rem; color: var(--text-tertiary); margin: 0 0 .3rem; }
+.stop-meta { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; margin-bottom: .35rem; }
+.stop-actions { display: flex; gap: .3rem; flex-wrap: wrap; }
+
+.btn-icon { background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-size: .85rem; padding: .25rem; border-radius: var(--radius-sm); align-self: flex-start; }
+.btn-icon:hover { color: #ef4444; background: rgba(239,68,68,.08); }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .5rem 1.1rem; border-radius: var(--radius-md); border: none; cursor: pointer;
+  font-size: .88rem; font-weight: 700; text-decoration: none;
+  transition: all .15s; -webkit-tap-highlight-color: transparent;
+}
+.btn:active { transform: scale(.96); }
+.btn-primary { background: var(--gradient-primary); color: white; box-shadow: 0 4px 14px rgba(13,148,136,.25); }
+.btn-ghost { background: rgba(0,0,0,.04); color: var(--text-secondary); border: 1px solid var(--border-light); }
+:global(.dark) .btn-ghost { background: rgba(255,255,255,.05); }
+.btn-coral { background: linear-gradient(135deg,#ef4444,#dc2626); color: white; }
+.btn-full { width: 100%; }
+.btn-sm { padding: .35rem .75rem; font-size: .8rem; }
+.btn-xs { padding: .22rem .55rem; font-size: .72rem; border: 1px solid var(--border-light); background: rgba(0,0,0,.03); color: var(--text-secondary); border-radius: var(--radius-sm); cursor: pointer; font-weight: 700; }
+:global(.dark) .btn-xs { background: rgba(255,255,255,.04); }
+.btn-xs:active { transform: scale(.94); }
+.btn-green { background: rgba(22,163,74,.1); color: #15803d; border-color: rgba(22,163,74,.25); }
+.btn-red-ghost { background: rgba(239,68,68,.08); color: #ef4444; border-color: rgba(239,68,68,.25); }
+
+/* Cards */
+.card { background: var(--surface-card); border: 1px solid var(--border-light); border-radius: var(--radius-lg); padding: 1rem 1.1rem; }
+.card-coral { background: linear-gradient(135deg, rgba(239,68,68,.06), rgba(249,115,22,.04)); border-color: rgba(239,68,68,.2); }
+.hidden { display: none !important; }
+.cta-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.cta-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #ef4444; margin: 0 0 .15rem; }
+.cta-desc { font-size: .85rem; font-weight: 600; color: var(--text-primary); margin: 0; }
+
+/* Badges */
+.badge { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 99px; font-size: .62rem; font-weight: 700; border: 1px solid; }
+.badge-dim { color: var(--text-tertiary); border-color: var(--border-light); background: transparent; }
+.badge-teal { color: var(--color-teal); border-color: rgba(13,148,136,.3); background: rgba(13,148,136,.08); }
+.badge-green { color: #16a34a; border-color: rgba(22,163,74,.3); background: rgba(22,163,74,.08); }
+.badge-red { color: #ef4444; border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.08); }
+
+/* Modal overlay + sheet */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); backdrop-filter: blur(4px); z-index: 50; }
+.sheet {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+  background: var(--surface-elevated); border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  max-height: 92dvh; display: flex; flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.sheet-drag { width: 40px; height: 4px; background: rgba(0,0,0,.12); border-radius: 99px; margin: .7rem auto .4rem; }
+:global(.dark) .sheet-drag { background: rgba(255,255,255,.15); }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; padding: .5rem 1.1rem .8rem; border-bottom: 1px solid var(--border-light); }
+.sheet-title { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin: 0; }
+.sheet-close { width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.06); border: none; cursor: pointer; font-size: 1rem; color: var(--text-tertiary); display: grid; place-items: center; }
+.sheet-close:hover { background: rgba(0,0,0,.1); }
+.sheet-body { flex: 1; overflow-y: auto; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .85rem; }
+
+/* Fields */
+.field { display: flex; flex-direction: column; gap: .35rem; }
+.field-label { font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-tertiary); }
+.inp {
+  background: rgba(0,0,0,.04); border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-md); padding: .58rem .85rem;
+  color: var(--text-primary); font-size: .9rem; width: 100%;
+  transition: all .15s; outline: none; font-family: inherit;
+}
+:global(.dark) .inp { background: rgba(255,255,255,.05); }
+.inp:focus { border-color: var(--color-teal); background: rgba(13,148,136,.04); box-shadow: 0 0 0 3px rgba(13,148,136,.1); }
+.inp::placeholder { color: var(--text-tertiary); }
+textarea.inp { resize: none; }
+
+/* Geo result */
+.geo-result { padding: .35rem .7rem; border-radius: var(--radius-sm); font-size: .75rem; font-weight: 600; border: 1px solid; }
+.geo-ok { color: var(--color-teal); border-color: rgba(13,148,136,.3); background: rgba(13,148,136,.07); }
+.geo-fail { color: #ef4444; border-color: rgba(239,68,68,.3); background: rgba(239,68,68,.07); }
+.geo-info { color: #d97706; border-color: rgba(217,119,6,.3); background: rgba(217,119,6,.07); }
+
+/* Priority group */
+.pri-group { display: flex; gap: .5rem; }
+.pri-btn {
+  flex: 1; padding: .5rem; border-radius: var(--radius-md); border: 1.5px solid var(--border-light);
+  cursor: pointer; font-size: .78rem; font-weight: 700; color: var(--text-tertiary);
+  background: none; transition: all .15s;
+}
+.pri-btn.selected { border-color: rgba(13,148,136,.4); color: var(--color-teal); background: rgba(13,148,136,.08); }
+.pri-btn[data-p="urgent"].selected { border-color: rgba(239,68,68,.4); color: #ef4444; background: rgba(239,68,68,.08); }
+.pri-btn[data-p="extra"].selected { border-color: rgba(139,92,246,.4); color: #8b5cf6; background: rgba(139,92,246,.08); }
+
+/* Method tabs */
+.method-tabs { display: flex; gap: .3rem; overflow-x: auto; scrollbar-width: none; }
+.method-tabs::-webkit-scrollbar { display: none; }
+.mtab {
+  flex-shrink: 0; padding: .4rem .8rem; border-radius: var(--radius-md);
+  border: 1.5px solid var(--border-light); font-size: .75rem; font-weight: 700;
+  color: var(--text-tertiary); background: none; cursor: pointer; transition: all .15s;
+}
+.mtab.active { border-color: rgba(13,148,136,.4); color: var(--color-teal); background: rgba(13,148,136,.08); }
+
+/* Panels */
+.mpanel { display: flex; flex-direction: column; gap: .75rem; }
+.mpanel.hidden { display: none; }
+
+/* GPS panel */
+.gps-card { display: flex; flex-direction: column; align-items: center; gap: .65rem; padding: 1.25rem; background: rgba(0,0,0,.03); border-radius: var(--radius-lg); border: 1px solid var(--border-light); text-align: center; }
+:global(.dark) .gps-card { background: rgba(255,255,255,.04); }
+.gps-emoji { font-size: 2.2rem; margin: 0; }
+.gps-title { font-size: .9rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+.gps-desc { font-size: .78rem; color: var(--text-tertiary); margin: 0; }
+.gps-coords { font-family: monospace; font-size: .75rem; color: var(--color-teal); margin: 0; }
+
+/* Companion */
+.comp-hint { font-size: .8rem; color: var(--text-secondary); padding: .65rem; background: rgba(239,68,68,.05); border: 1px solid rgba(239,68,68,.15); border-radius: var(--radius-md); margin: 0; }
+.comp-preview { font-family: monospace; font-size: .75rem; color: var(--color-teal); padding: .4rem .65rem; background: rgba(13,148,136,.06); border: 1px solid rgba(13,148,136,.2); border-radius: var(--radius-md); margin: 0; }
+
+/* Loader */
+.loader { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.empty-state { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 2.5rem 1rem; text-align: center; }
+.empty-icon { font-size: 2.5rem; filter: grayscale(.4); margin: 0; }
+.empty-title { font-size: .9rem; font-weight: 700; color: var(--text-secondary); margin: 0; }
+.empty-desc { font-size: .8rem; color: var(--text-tertiary); margin: 0; }
+</style>

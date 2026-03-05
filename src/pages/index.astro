@@ -2,7 +2,7 @@
 import MainLayout from '../layouts/MainLayout.astro';
 ---
 
-<MainLayout title="CancúnMueve" hideNav={true}>
+<MainLayout title="Mueve Reparto" hideNav={true}>
 	<div class="splash-container">
 		<div class="grid-overlay">
 			<svg class="h-full w-full" xmlns="http://www.w3.org/2000/svg">
@@ -20,20 +20,23 @@ import MainLayout from '../layouts/MainLayout.astro';
 		<div class="brand-section animate-float">
 			<div class="brand-logo-container">
 				<div class="brand-icon">
-					<svg class="icon-bus-svg" width="60" height="60" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4S4 2.5 4 6v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>
+					<!-- Motorcycle / delivery icon -->
+					<svg class="icon-moto-svg" width="60" height="60" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+						<path d="M19 7c0-1.1-.9-2-2-2h-3l2 4h3c.55 0 1-.45 1-1v-1zm-5-2l-1.5 2.94L11.32 5H8.5L6.24 9H4c-1.1 0-2 .9-2 2v3h2c0 1.66 1.34 3 3 3s3-1.34 3-3h4c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-3.48L19 7h-5zM7 15.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm10 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
+					</svg>
 				</div>
 				<h1 class="brand-title">
-					Cancún<span class="brand-title-light">Mueve</span>
+					Mueve<span class="brand-title-light">Reparto</span>
 				</h1>
 			</div>
 			<p class="brand-tagline">
-				La ciudad en tu mano
+				Tu ruta. Tu tiempo. Tu ingreso.
 			</p>
 		</div>
 
 		<div class="status-section">
 			<div class="connecting-status">
-				<span class="status-text animate-pulse">Connecting to Engine...</span>
+				<span class="status-text animate-pulse">Iniciando motor de rutas...</span>
 				<div class="location-pulse-container">
 					<div class="pulse-ring animate-ping"></div>
 					<div class="location-icon-circle animate-pulse-slow">
@@ -42,7 +45,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 				</div>
 			</div>
 			<div class="version-tag">
-				<span class="version-text">v1.0.5</span>
+				<span class="version-text">v0.1.0 · NN+2opt</span>
 			</div>
 		</div>
 
@@ -52,13 +55,12 @@ import MainLayout from '../layouts/MainLayout.astro';
 	<script>
 		import { navigate } from 'astro:transitions/client';
 
-		// Simulate splash delay then redirect to home
 		setTimeout(() => {
 			const currentUrl = new URL(window.location.href);
 			const targetUrl = new URL('/home', window.location.origin);
 			targetUrl.search = currentUrl.search;
 			navigate(targetUrl.toString());
-		}, 3000);
+		}, 2800);
 	</script>
 </MainLayout>
 
@@ -67,7 +69,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 		position: relative;
 		width: 100%;
 		height: 100vh;
-		background: linear-gradient(175deg, #0d9488 0%, #14b8a6 45%, #ccfbf1 75%, #f0fdfa 100%);
+		background: linear-gradient(175deg, #0d9488 0%, #0891b2 45%, #164e63 85%, #0c1a2e 100%);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -81,7 +83,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		opacity: 0.1;
+		opacity: 0.08;
 		mix-blend-mode: overlay;
 		overflow: hidden;
 	}
@@ -91,7 +93,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 	.top-spacer { height: 2.5rem; width: 100%; }
 
-	/* Brand Section */
 	.brand-section {
 		display: flex;
 		flex-direction: column;
@@ -110,19 +111,19 @@ import MainLayout from '../layouts/MainLayout.astro';
 		background-color: white;
 		border-radius: 1.5rem;
 		padding: 1rem;
-		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+		box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.08);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 	}
 
-	.icon-bus-svg {
+	.icon-moto-svg {
 		color: #0d9488;
 	}
 
 	.brand-title {
 		color: white;
-		font-size: 3.75rem;
+		font-size: 3.25rem;
 		font-weight: 800;
 		letter-spacing: -0.025em;
 		margin: 0;
@@ -132,16 +133,15 @@ import MainLayout from '../layouts/MainLayout.astro';
 	.brand-title-light { font-weight: 300; }
 
 	.brand-tagline {
-		color: white;
-		font-size: 1.25rem;
+		color: rgba(255, 255, 255, 0.9);
+		font-size: 1.1rem;
 		font-weight: 500;
+		letter-spacing: 0.1em;
 		text-transform: uppercase;
-		letter-spacing: 0.25em;
 		opacity: 0.9;
 		margin-top: 1rem;
 	}
 
-	/* Status Section */
 	.status-section {
 		width: 100%;
 		display: flex;
@@ -186,8 +186,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 		border: 1px solid rgba(255, 255, 255, 0.3);
 	}
 
-	/* icon-location removed - using inline SVG */
-
 	.version-tag {
 		position: absolute;
 		bottom: 0;
@@ -213,7 +211,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 		border-radius: 9999px;
 	}
 
-	/* Animations */
 	@keyframes float {
 		0%, 100% { transform: translateY(0); }
 		50% { transform: translateY(-10px); }
