@@ -1,9 +1,4 @@
 User-agent: *
 Allow: /
 
-# No indexar páginas de estado interno
-Disallow: /offline
-Disallow: /api/
-
-# Sitemap
-Sitemap: https://muevereparto.sistemascancunjefe.com/sitemap-index.xml
+Sitemap: http://localhost:4321/sitemap-index.xml

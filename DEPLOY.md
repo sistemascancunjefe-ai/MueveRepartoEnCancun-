@@ -1,8 +1,8 @@
-# DEPLOY.md — Instrucciones de Despliegue
+# Deployment Instructions
 
 This project is configured as a **Static Site** application using Astro's static adapter. It is built to serve pre-rendered HTML/CSS/JS files and WASM modules.
 
----
+## Render Deployment Guide
 
 1.  **Service Type**: Create a **Static Site**.
 2.  **Build Command**: `bash scripts/setup-render.sh`
@@ -13,19 +13,11 @@ This project is configured as a **Static Site** application using Astro's static
     *   `NODE_VERSION`: `20` (Recommended minimum)
     *   `ENABLE_PNPM`: `true`
 
-| Campo | Valor |
-|-------|-------|
-| Service Type | **Web Service** |
-| Branch | `main` |
-| Build Command | `pnpm run build` |
-| Start Command | `node ./dist/server/entry.mjs` |
-| Node Version | `20.10.0` |
+### Troubleshooting "Publish directory does not exist"
 
 If you see an error like `Publish directory does not exist!`, make sure `scripts/setup-render.sh` completes successfully. The final step is `pnpm run build` which populates the `dist` directory.
 
-| Variable | Valor | Requerida |
-|----------|-------|-----------|
-| `NODE_VERSION` | `20.10.0` | Sí |
+### WASM Build Notes
 
 The build process (`bash scripts/setup-render.sh`) installs Rust and `wasm-pack` explicitly.
 -   It compiles the Rust code into WebAssembly.
