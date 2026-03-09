@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Pre-commit steps for MueveCancun optimization
 
 echo "Checking formatting..."
