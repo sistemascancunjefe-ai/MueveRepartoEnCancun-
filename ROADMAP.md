@@ -3,7 +3,7 @@
 Este roadmap define las etapas de evolución técnica y de producto para la plataforma.
 
 ## 🟢 Fase 1: Frontend & UI/UX Base (Actual)
-- ✅ Migración a Astro 5.0 y TailwindCSS v4.
+- ✅ Migración a Astro 5.0 y TailwindCSS v3.
 - ✅ Implementación de diseño PWA offline-first.
 - ✅ Componentes visuales y layouts ("Sunny Mode" & Dark Mode).
 - 🔄 Optimización de interacciones (animaciones, estados de carga).
