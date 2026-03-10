@@ -56,6 +56,7 @@ export interface GeoCache {
   timestamp: number; // Date.now()
 }
 
+
 export const STORES = {
   STOPS:    'stops',
   SYNC:     'sync_queue',
@@ -79,6 +80,9 @@ function openDB(): Promise<IDBDatabase> {
       const db = (e.target as IDBOpenDBRequest).result;
       const oldVersion = e.oldVersion;
 
+      // Stores v1 (solo si no existen — para instalaciones nuevas)
+
+
       if (!db.objectStoreNames.contains(STORES.STOPS)) {
         const stops = db.createObjectStore(STORES.STOPS, { keyPath: 'id' });
         stops.createIndex('status',   'status',   { unique: false });
@@ -99,6 +103,7 @@ function openDB(): Promise<IDBDatabase> {
         db.createObjectStore(STORES.STATS, { keyPath: 'date' });
       }
 
+      // Store v2 (solo si oldVersion < 2)
       if (oldVersion < 2 && !db.objectStoreNames.contains(STORES.GEO)) {
         db.createObjectStore(STORES.GEO, { keyPath: 'key' });
       }
@@ -200,6 +205,8 @@ export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+
+// ── Geocoding ──
 let _lastNominatimCall = 0;
 
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {

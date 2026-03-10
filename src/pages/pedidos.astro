@@ -475,7 +475,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
         <!-- Number -->
         <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}">${s.order + 1}</div>
-
         <!-- Content -->
         <div style="flex:1;min-width:0;">
           <div style="display:flex;flex-direction:column;gap:0.125rem;">
@@ -487,7 +486,14 @@ import MainLayout from '../layouts/MainLayout.astro';
             </div>
           ${s.note ? `<p class="stop-meta">${s.note}</p>` : ''}
           ${s.clientName ? `<p class="stop-meta">${s.clientName}${s.clientPhone ? ' · ' + s.clientPhone : ''}</p>` : ''}
+          <span id="geo-${s.id}" class="geo-indicator" style="display:none;font-size:0.75rem;color:var(--text-tertiary);align-items:center;gap:0.25rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+            </svg>
+            Buscando coords...
+          </span>
         </div>
+
 
         <!-- Right side -->
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.375rem;flex-shrink:0;">
@@ -602,6 +608,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (btn) btn.disabled = !addr;
   }
 
+
+  function showGeocodingIndicator(id: string, show: boolean) {
+    const el = document.getElementById(`geo-${id}`);
+    if (el) el.style.display = show ? 'flex' : 'none';
+  }
+
   // ── Save stop ──
   async function saveStop() {
     const address = getAddressValue();
@@ -625,6 +637,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       createdAt:   Date.now(),
     };
 
+
     await dbPut(STORES.STOPS, stop);
     closeAddSheet();
     await renderStops();
@@ -640,6 +653,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       showGeocodingIndicator(stop.id, false);
     }
   }
+
 
   // ── Detail Sheet ──
   function openDetail(id: string) {
@@ -744,6 +758,22 @@ import MainLayout from '../layouts/MainLayout.astro';
       panel.style.display = m === mode ? 'block' : 'none';
     });
     updateSaveBtn();
+  }
+
+
+  async function geocodePendingStops() {
+    if (!navigator.onLine) return;
+    const stops = await getStops();
+    const pending = stops.filter(s => !s.lat && !s.lng && s.status !== 'completed');
+    for (const stop of pending) {
+      const coords = await geocodeAddress(stop.address);
+      if (coords) {
+        await dbPut(STORES.STOPS, { ...stop, lat: coords.lat, lng: coords.lng });
+      }
+    }
+    if (pending.length > 0) {
+      await renderStops();
+    }
   }
 
   // ── Init ──
