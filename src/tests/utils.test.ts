@@ -183,8 +183,6 @@ describe('readingTime Utility', () => {
   });
 });
 
-  });
-});
 
 describe('safeUrl Utility', () => {
   it('should encode string parameters', () => {
