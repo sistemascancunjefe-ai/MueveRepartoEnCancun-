@@ -29,14 +29,13 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::create_pool().await?;
 
-    let jwt_secret: std::sync::Arc<str> = env::var("JWT_SECRET")
-        .expect("JWT_SECRET must be set")
-        .into();
-
-    let app_state = AppState { pool, jwt_secret };
-
-    let allowed_origin = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:4321".to_string());
+    let allowed_origin = env::var("ALLOWED_ORIGINS").map_err(|_| {
+        anyhow::anyhow!(
+            "ALLOWED_ORIGINS env var is required. \
+            Set it to the frontend origin (e.g. https://muevereparto.onrender.com). \
+            For local development use http://localhost:4321."
+        )
+    })?;
 
     let cors = CorsLayer::new()
         .allow_origin(allowed_origin.parse::<HeaderValue>()?)
