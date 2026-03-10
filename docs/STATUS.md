@@ -1,7 +1,7 @@
 # STATUS.md — Mueve Reparto
 
 **Fecha:** 2026-03-10
-**Última revisión:** Claude Code (Sonnet 4.6) — Branch `claude/clone-delivery-platform-9zhnf`
+**Última revisión:** Copilot Agent — Branch `copilot/update-documentation-and-roadmap`
 
 ---
 
