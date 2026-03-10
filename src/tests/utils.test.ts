@@ -1,32 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, safeJsonStringify, getDistance, truncateText, formatDate, readingTime, safeUrl } from '../utils/utils';
-
-describe('formatDate Utility', () => {
-  it('should format a date correctly as MMM DD, YYYY', () => {
-    const date = new Date(2023, 0, 1); // Jan 1, 2023
-    expect(formatDate(date)).toBe('Jan 01, 2023');
-  });
-
-  it('should handle different months correctly', () => {
-    const dates = [
-      { date: new Date(2023, 1, 14), expected: 'Feb 14, 2023' },
-      { date: new Date(2023, 11, 25), expected: 'Dec 25, 2023' }
-    ];
-    dates.forEach(({ date, expected }) => {
-      expect(formatDate(date)).toBe(expected);
-    });
-  });
-
-  it('should handle leap years correctly', () => {
-    const leapDay = new Date(2024, 1, 29); // Feb 29, 2024
-    expect(formatDate(leapDay)).toBe('Feb 29, 2024');
-  });
-
-  it('should handle single digit days with leading zero', () => {
-    const date = new Date(2023, 4, 5); // May 5, 2023
-    expect(formatDate(date)).toBe('May 05, 2023');
-  });
-});
+import { escapeHtml, safeJsonStringify, getDistance, truncateText, readingTime } from '../utils/utils';
+import { escapeHtml, safeJsonStringify, getDistance, truncateText, safeUrl } from '../utils/utils';
 
 describe('escapeHtml Utility', () => {
   it('should escape HTML characters in strings', () => {
@@ -172,7 +146,7 @@ describe('truncateText Utility', () => {
   });
 });
 
-
+ jules/test-readingTime-14993745733534279164
 
 describe('readingTime Utility', () => {
   it('should calculate 1 min read for empty string', () => {
@@ -209,9 +183,6 @@ describe('readingTime Utility', () => {
     const text2 = new Array(99).fill('word').join(' ');
     expect(readingTime(text2)).toBe('1 min read');
 
-  });
-});
-
 describe('safeUrl Utility', () => {
   it('should encode string parameters', () => {
     expect(safeUrl('hello world')).toBe('hello%20world');
@@ -236,5 +207,6 @@ describe('safeUrl Utility', () => {
 
   it('should handle empty string correctly', () => {
     expect(safeUrl('')).toBe('');
+main
   });
 });

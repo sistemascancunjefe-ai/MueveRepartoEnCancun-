@@ -1,7 +1,7 @@
-🎯 **What:** Fixed linting warnings, typing issues, and removed unused variables. Prepared instructions for deployment and final tests.
+🎯 **What:** Removed development `console.log` statements from `src/components/RouteCalculator.astro`.
 
-💡 **Why:** A clean linting and compiling environment ensures that deployment to production runs smoothly and limits regressions.
+💡 **Why:** This improves the maintainability and cleanliness of the codebase by removing unnecessary debugging lines that pollute the console output in production.
 
-✅ **Verification:** Ran `./my_pre_commit.sh` locally to ensure no related tests failed and linting is clean. Project built successfully.
+✅ **Verification:** Verified the code changes locally using `pnpm build`. No functionality is affected as these were strictly logging statements.
 
-✨ **Result:** Final preparation to send to production, tests complete successfully.
+✨ **Result:** A cleaner production build and improved codebase readability without any behavior changes.

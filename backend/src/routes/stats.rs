@@ -1,44 +1,83 @@
-use axum::{extract::State, http::StatusCode, Json};
-use chrono::Utc;
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    Json,
+};
+use serde::Deserialize;
 use sqlx::PgPool;
 
-use crate::{middleware::auth::AuthUser, models::DailyStats};
+use crate::{middleware::device::DeviceId, models::*};
 
-pub async fn get_daily_stats(
-    AuthUser { user_id }: AuthUser,
+#[derive(Deserialize)]
+pub struct StatsQuery {
+    #[serde(default = "default_days")]
+    pub days: i32,
+}
+
+fn default_days() -> i32 {
+    7
+}
+
+/// GET /stats?days=7 — Estadísticas de los últimos N días (máx 90)
+pub async fn get_stats(
+    DeviceId(device_id): DeviceId,
     State(pool): State<PgPool>,
-) -> Result<Json<DailyStats>, StatusCode> {
-    let today = Utc::now().date_naive();
+    Query(q): Query<StatsQuery>,
+) -> Result<Json<Vec<DailyStats>>, StatusCode> {
+    let days = q.days.clamp(1, 90);
 
-    // Si no hay stats, devolvemos stats en 0.
-    // Opcionalmente podemos crearlo aquí.
-    let stat = sqlx::query_as!(
-        DailyStats,
+    sqlx::query_as::<_, DailyStats>(
         r#"
-        SELECT id, user_id, date, deliveries, income, goal, created_at
+        SELECT id, device_id, stat_date, completed, total,
+               income, distance_km, duration_min
         FROM daily_stats
-        WHERE user_id = $1 AND date = $2
+        WHERE device_id = $1
+          AND stat_date >= CURRENT_DATE - ($2::integer * INTERVAL '1 day')
+        ORDER BY stat_date DESC
         "#,
-        user_id,
-        today
     )
-    .fetch_optional(&pool)
+    .bind(&device_id)
+    .bind(days)
+    .fetch_all(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map(Json)
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+}
 
-    match stat {
-        Some(s) => Ok(Json(s)),
-        None => {
-            // Devolver objeto por defecto (sin insertarlo necesariamente)
-            Ok(Json(DailyStats {
-                id: uuid::Uuid::new_v4(),
-                user_id,
-                date: today,
-                deliveries: 0,
-                income: 0.0,
-                goal: None,
-                created_at: Utc::now(),
-            }))
-        }
-    }
+/// POST /stats — Upsert estadísticas del día
+pub async fn upsert_stats(
+    DeviceId(device_id): DeviceId,
+    State(pool): State<PgPool>,
+    Json(body): Json<UpsertStats>,
+) -> Result<Json<DailyStats>, StatusCode> {
+    crate::db::upsert_device(&pool, &device_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    sqlx::query_as::<_, DailyStats>(
+        r#"
+        INSERT INTO daily_stats
+            (device_id, stat_date, completed, total, income, distance_km, duration_min)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (device_id, stat_date) DO UPDATE SET
+            completed    = EXCLUDED.completed,
+            total        = EXCLUDED.total,
+            income       = EXCLUDED.income,
+            distance_km  = EXCLUDED.distance_km,
+            duration_min = EXCLUDED.duration_min
+        RETURNING id, device_id, stat_date, completed, total,
+                  income, distance_km, duration_min
+        "#,
+    )
+    .bind(&device_id)
+    .bind(body.stat_date)
+    .bind(body.completed)
+    .bind(body.total)
+    .bind(body.income)
+    .bind(body.distance_km)
+    .bind(body.duration_min)
+    .fetch_one(&pool)
+    .await
+    .map(Json)
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
