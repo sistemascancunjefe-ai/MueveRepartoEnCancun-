@@ -10,9 +10,7 @@ pub async fn get_daily_stats(
 ) -> Result<Json<DailyStats>, StatusCode> {
     let today = Utc::now().date_naive();
 
-    // Si no hay stats, devolvemos stats en 0.
-    // Opcionalmente podemos crearlo aquí.
-    let stat = sqlx::query_as!(
+    sqlx::query_as!(
         DailyStats,
         r#"
         SELECT id, user_id, date, deliveries, income, goal, created_at
@@ -24,21 +22,8 @@ pub async fn get_daily_stats(
     )
     .fetch_optional(&pool)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    match stat {
-        Some(s) => Ok(Json(s)),
-        None => {
-            // Devolver objeto por defecto (sin insertarlo necesariamente)
-            Ok(Json(DailyStats {
-                id: uuid::Uuid::new_v4(),
-                user_id,
-                date: today,
-                deliveries: 0,
-                income: 0.0,
-                goal: None,
-                created_at: Utc::now(),
-            }))
-        }
-    }
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .map(Json)
+    .ok_or(StatusCode::NOT_FOUND)
 }
+

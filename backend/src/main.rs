@@ -14,6 +14,9 @@ mod db;
 mod middleware;
 mod models;
 mod routes;
+mod state;
+
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,6 +31,12 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let pool = db::create_pool().await?;
+
+    let jwt_secret: std::sync::Arc<str> = env::var("JWT_SECRET")
+        .expect("JWT_SECRET must be set")
+        .into();
+
+    let app_state = AppState { pool, jwt_secret };
 
     let allowed_origin = env::var("ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:4321".to_string());
@@ -50,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/stats/daily", get(routes::stats::get_daily_stats))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .with_state(app_state);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())

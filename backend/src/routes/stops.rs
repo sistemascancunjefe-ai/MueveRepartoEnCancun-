@@ -13,6 +13,7 @@ pub async fn list_stops(
         SELECT id, user_id, address, client_name, phone, notes, lat, lng, status, income, created_at, completed_at
         FROM stops
         WHERE user_id = $1
+        ORDER BY created_at ASC, id ASC
         "#,
         user_id
     )
@@ -35,11 +36,16 @@ pub async fn sync_stops(
             r#"
             INSERT INTO stops (id, user_id, address, client_name, phone, notes, lat, lng, status, income, created_at, completed_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'pending'), $10, COALESCE($11, NOW()), $12)
-            ON CONFLICT (id) DO UPDATE SET
-                status = EXCLUDED.status,
+            ON CONFLICT (user_id, id) DO UPDATE SET
+                address      = EXCLUDED.address,
+                client_name  = EXCLUDED.client_name,
+                phone        = EXCLUDED.phone,
+                lat          = EXCLUDED.lat,
+                lng          = EXCLUDED.lng,
+                status       = EXCLUDED.status,
                 completed_at = EXCLUDED.completed_at,
-                notes = EXCLUDED.notes,
-                income = EXCLUDED.income
+                notes        = EXCLUDED.notes,
+                income       = EXCLUDED.income
             "#,
             stop.id,
             user_id,
@@ -68,3 +74,4 @@ pub async fn sync_stops(
         errors,
     }))
 }
+

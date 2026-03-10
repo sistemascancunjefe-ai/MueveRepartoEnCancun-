@@ -1,5 +1,7 @@
 -- Mueve Reparto — Migración inicial
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS users (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   phone       TEXT NOT NULL UNIQUE,
@@ -8,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS stops (
-  id           TEXT PRIMARY KEY,
+  id           TEXT NOT NULL,
   user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   address      TEXT NOT NULL,
   client_name  TEXT,
@@ -19,11 +21,13 @@ CREATE TABLE IF NOT EXISTS stops (
   status       TEXT NOT NULL DEFAULT 'pending',
   income       FLOAT8,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  PRIMARY KEY (user_id, id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_stops_user_id ON stops (user_id);
-CREATE INDEX IF NOT EXISTS idx_stops_status  ON stops (status);
+CREATE INDEX IF NOT EXISTS idx_stops_status ON stops (status);
+CREATE INDEX IF NOT EXISTS idx_stops_user_status ON stops (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_stops_user_created ON stops (user_id, created_at ASC, id ASC);
 
 CREATE TABLE IF NOT EXISTS daily_stats (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
