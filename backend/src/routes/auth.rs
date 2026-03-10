@@ -11,13 +11,27 @@ fn is_valid_otp_format(code: &str) -> bool {
     code.len() == 6 && code.chars().all(|c| c.is_ascii_digit())
 }
 
+/// Returns a masked representation of a phone number where, if the number
+/// is longer than 4 characters, all but the last 4 characters are replaced
+/// with '*'. Shorter numbers are returned unchanged.
+fn mask_phone(phone: &str) -> String {
+    let len = phone.chars().count();
+    if len <= 4 {
+        return phone.to_string();
+    }
+    let mask_len = len - 4;
+    let masked_prefix = "*".repeat(mask_len);
+    let suffix: String = phone.chars().skip(mask_len).collect();
+    format!("{}{}", masked_prefix, suffix)
+}
+
 pub async fn request_otp(
     State(_pool): State<PgPool>,
     Json(payload): Json<OtpRequest>,
 ) -> Result<StatusCode, StatusCode> {
     // Stub: En un sistema real, aquí llamarías a Twilio/WhatsApp API.
     // The phone number is logged for observability; the OTP code is never logged.
-    tracing::info!("OTP requested for phone: {}", payload.phone);
+    tracing::info!("OTP requested for phone: {}", mask_phone(&payload.phone));
     Ok(StatusCode::OK)
 }
 
