@@ -112,9 +112,9 @@ backend/src/
 ├── main.rs          ← AppState { pool, jwt_secret }, rutas registradas
 ├── state.rs         ← AppState + JwtSecret (FromRef para extracción sin copia)
 ├── routes/
-│   ├── stops.rs     ← CRUD paradas + paywall 402
-│   ├── stats.rs     ← GET/POST daily_stats
-│   ├── auth.rs      ← send-otp, verify-otp, me
+│   ├── stops.rs     ← CRUD paradas (paywall 402 pendiente)
+│   ├── stats.rs     ← GET daily_stats (POST pendiente)
+│   ├── auth.rs      ← send-otp, verify-otp, me (rutas /auth/* aún no registradas en main.rs)
 │   └── mod.rs
 └── middleware/
     └── auth.rs      ← extractor AuthUser (JWT Bearer)
