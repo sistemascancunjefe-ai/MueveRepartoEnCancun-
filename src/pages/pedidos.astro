@@ -159,6 +159,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 <script>
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES } from '../lib/idb';
+  import { escapeHtml } from '../utils/utils';
   import type { Stop } from '../lib/idb';
 
 
