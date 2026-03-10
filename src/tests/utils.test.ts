@@ -145,6 +145,7 @@ describe('truncateText Utility', () => {
   });
 });
 
+
 describe('readingTime Utility', () => {
   it('should calculate 1 min read for empty string', () => {
     expect(readingTime('')).toBe('1 min read');
@@ -181,6 +182,7 @@ describe('readingTime Utility', () => {
     expect(readingTime(text2)).toBe('1 min read');
   });
 });
+
 
 describe('safeUrl Utility', () => {
   it('should encode string parameters', () => {

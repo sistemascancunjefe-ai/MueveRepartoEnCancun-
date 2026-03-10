@@ -132,9 +132,6 @@ export async function dbPutMany<T>(store: string, values: T[]): Promise<void> {
   if (values.length === 0) return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    let settled = false;
-    const settle = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
-
     // durability:'relaxed' skips the OS-level fsync on each write,
     // significantly improving throughput for bulk inserts/updates.
     const tx = db.transaction(store, 'readwrite', { durability: 'relaxed' });

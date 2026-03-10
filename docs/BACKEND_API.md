@@ -77,6 +77,7 @@ Sincroniza un lote (batch) de paradas (desde IDB al backend). Usado cuando el re
 
 ### GET `/api/stats/daily`
 Obtiene las estadísticas de hoy del usuario autenticado.
+Devuelve `404` si aún no existe ninguna entrada para la fecha de hoy.
 
 **Response:**
 ```json
@@ -85,6 +86,8 @@ Obtiene las estadísticas de hoy del usuario autenticado.
   "user_id": "uuid",
   "date": "2023-10-10",
   "deliveries": 10,
-  "income": 500.00
+  "income": 500.00,
+  "goal": 600.00,
+  "created_at": "2023-10-10T08:00:00Z"
 }
 ```

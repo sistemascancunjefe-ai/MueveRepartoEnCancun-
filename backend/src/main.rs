@@ -11,6 +11,9 @@ mod db;
 mod middleware;
 mod models;
 mod routes;
+mod state;
+
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -60,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/stats", post(routes::stats::upsert_stats))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .with_state(app_state);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
