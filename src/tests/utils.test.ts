@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, safeJsonStringify, getDistance, truncateText, formatDate } from '../utils/utils';
+import { escapeHtml, safeJsonStringify, getDistance, truncateText, formatDate, readingTime, safeUrl } from '../utils/utils';
 
 describe('formatDate Utility', () => {
   it('should format a date correctly as MMM DD, YYYY', () => {
