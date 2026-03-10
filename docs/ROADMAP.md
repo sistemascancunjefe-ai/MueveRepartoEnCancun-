@@ -113,7 +113,7 @@
 ### Tareas completadas
 - [x] API REST en Rust (Axum framework) — `backend/`
 - [x] PostgreSQL en Render (managed database)
-- [x] Migración `001_initial.sql` — tablas `devices`, `stops`, `daily_stats`
+- [x] Migración `001_initial.sql` — tablas `users`, `stops`, `daily_stats`
 - [x] Endpoints CRUD: `GET /stops`, `POST /stops`, `PATCH /stops/:id`, `DELETE /stops/:id`
 - [x] Endpoint bulk: `POST /stops/sync`
 - [x] Estadísticas: `GET /stats`, `POST /stats`
