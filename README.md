@@ -4,6 +4,13 @@
 
 **Mueve Reparto** es una PWA offline-first diseñada para repartidores independientes en Cancún y zonas similares. Organiza paradas, traza rutas, notifica clientes por WhatsApp/Telegram y mide tu productividad diaria — todo sin depender de internet.
 
+
+## Capturas de Pantalla
+
+| Home | Rutas | Pedidos | Reparto | Perfil |
+|------|-------|---------|---------|--------|
+| ![Home](docs/screenshots/home.png) | ![Rutas](docs/screenshots/rutas.png) | ![Pedidos](docs/screenshots/pedidos.png) | ![Reparto](docs/screenshots/reparto.png) | ![Perfil](docs/screenshots/perfil.png) |
+
 ---
 
 ## El Problema
