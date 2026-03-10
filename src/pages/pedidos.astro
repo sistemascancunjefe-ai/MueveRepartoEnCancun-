@@ -764,24 +764,44 @@ import MainLayout from '../layouts/MainLayout.astro';
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
-        let width = img.width;
-        let height = img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        // Short-circuit: no resize needed, return original to avoid lossy re-encoding
+        if (img.width <= maxWidth) {
+          img.src = '';
+          return resolve(file);
         }
+
+        const width = maxWidth;
+        const height = Math.round((img.height * maxWidth) / img.width);
 
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
+
+        const cleanup = () => {
+          // Release canvas backing store and decoded image data for GC
+          canvas.width = 0;
+          canvas.height = 0;
+          img.src = '';
+        };
+
         const ctx = canvas.getContext('2d');
-        if (!ctx) return reject(new Error('Canvas context not available'));
+        if (!ctx) {
+          cleanup();
+          return reject(new Error('Canvas context not available'));
+        }
         ctx.drawImage(img, 0, 0, width, height);
 
         canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Canvas to Blob failed'));
+          try {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas to Blob failed'));
+            }
+          } finally {
+            cleanup();
+          }
         }, 'image/jpeg', 0.8);
       };
       img.onerror = () => {
