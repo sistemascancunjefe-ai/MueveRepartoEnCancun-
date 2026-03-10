@@ -7,6 +7,10 @@ const stripeBuyButtonId  = import.meta.env.PUBLIC_STRIPE_BUY_BUTTON_ID ?? 'buy_b
 ---
 
 <MainLayout title="Mi suscripción">
+  <!-- Script Stripe en <head> para que el custom element se defina antes de renderizar -->
+  <Fragment slot="head">
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+  </Fragment>
   <div class="subs-page px-4 pt-4">
 
     <div class="page-header stagger-item">
@@ -120,13 +124,7 @@ const stripeBuyButtonId  = import.meta.env.PUBLIC_STRIPE_BUY_BUTTON_ID ?? 'buy_b
       badge.textContent = 'Plan Gratuito';
       badge.className   = 'plan-badge plan-free';
       details.innerHTML = `<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Hasta 20 paradas activas por día</p>`;
-      // Buy Button ya está en el HTML, solo carga el script Stripe si no fue cargado
-      if (!document.querySelector('script[src*="buy-button.js"]')) {
-        const s = document.createElement('script');
-        s.src = 'https://js.stripe.com/v3/buy-button.js';
-        s.async = true;
-        document.head.appendChild(s);
-      }
+      // El script de Stripe ya se cargó en <head> vía slot — no hacer nada aquí
     }
 
     // Sección cuenta
