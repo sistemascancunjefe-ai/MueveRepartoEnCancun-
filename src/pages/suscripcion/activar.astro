@@ -1,0 +1,172 @@
+---
+// SSR — no prerender: verifica pago con Stripe API usando secret key server-side.
+export const prerender = false;
+
+import MainLayout from '../../layouts/MainLayout.astro';
+
+const sessionId = Astro.url.searchParams.get('session_id') ?? '';
+let status: 'success' | 'error' | 'no_session' = 'no_session';
+let customerEmail = '';
+let errorMsg = '';
+
+if (sessionId) {
+  const secret = import.meta.env.STRIPE_SECRET_KEY ?? '';
+  if (!secret) {
+    status = 'error';
+    errorMsg = 'Configuración incompleta. Contacta soporte.';
+  } else {
+    try {
+      const creds = Buffer.from(`${secret}:`).toString('base64');
+      const res = await fetch(
+        `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+        { headers: { Authorization: `Basic ${creds}` } }
+      );
+      if (res.ok) {
+        const data = await res.json() as { payment_status: string; customer_details?: { email?: string } };
+        if (data.payment_status === 'paid') {
+          status = 'success';
+          customerEmail = data.customer_details?.email ?? '';
+        } else {
+          status = 'error';
+          errorMsg = 'El pago no fue completado. Intenta de nuevo.';
+        }
+      } else {
+        status = 'error';
+        errorMsg = 'No se pudo verificar el pago con Stripe.';
+      }
+    } catch {
+      status = 'error';
+      errorMsg = 'Error de conexión al verificar. Recarga la página.';
+    }
+  }
+}
+---
+
+<MainLayout title="Activando Plan Pro">
+  <div class="activate-page px-4 pt-8">
+
+    {status === 'success' && (
+      <div class="result-card success" id="success-card">
+        <div class="icon-circle success-circle">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h1 class="result-title">¡Plan Pro activado!</h1>
+        <p class="result-sub">
+          {customerEmail ? `Gracias, ${customerEmail}.` : 'Gracias por tu suscripción.'}
+          <br/>Paradas ilimitadas y métricas completas desbloqueadas.
+        </p>
+        <p class="redirect-msg">Redirigiendo a tu dashboard…</p>
+
+        <script is:inline define:vars={{ sessionId }}>
+          // Activar pro en localStorage (verificación ya fue server-side)
+          try {
+            localStorage.setItem('mr-plan', 'pro');
+            if (sessionId) localStorage.setItem('mr-stripe-session', sessionId);
+          } catch (_) {}
+          // Redirigir al home después de 2.5s
+          setTimeout(() => { window.location.href = '/home'; }, 2500);
+        </script>
+      </div>
+    )}
+
+    {status === 'error' && (
+      <div class="result-card error">
+        <div class="icon-circle error-circle">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-urgent)" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <h1 class="result-title">No se pudo verificar</h1>
+        <p class="result-sub">{errorMsg}</p>
+        <a href="/suscripcion" class="btn-primary btn-md" style="display:inline-block;margin-top:1.5rem;">
+          Volver a suscripción
+        </a>
+        <p class="support-note">
+          Si el cobro fue exitoso, contacta soporte con tu comprobante de pago.
+        </p>
+      </div>
+    )}
+
+    {status === 'no_session' && (
+      <div class="result-card neutral">
+        <h1 class="result-title">Enlace inválido</h1>
+        <p class="result-sub">Accede a esta página solo desde el enlace de confirmación de Stripe.</p>
+        <a href="/suscripcion" class="btn-primary btn-md" style="display:inline-block;margin-top:1.5rem;">
+          Ir a suscripción
+        </a>
+      </div>
+    )}
+
+  </div>
+</MainLayout>
+
+<style>
+  .activate-page {
+    max-width: 420px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .result-card {
+    width: 100%;
+    background: var(--surface-card);
+    border-radius: var(--radius-xl);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    border: 1px solid var(--border-light);
+  }
+
+  .result-card.success {
+    border-color: rgba(0, 232, 162, 0.3);
+    background: linear-gradient(135deg, rgba(0,232,162,0.06) 0%, var(--surface-card) 100%);
+  }
+
+  .result-card.error {
+    border-color: rgba(255, 90, 95, 0.3);
+  }
+
+  .icon-circle {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+  }
+
+  .success-circle { background: rgba(0, 232, 162, 0.12); }
+  .error-circle   { background: rgba(255, 90, 95, 0.12); }
+
+  .result-title {
+    font-size: 1.375rem;
+    font-weight: 900;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem;
+  }
+
+  .result-sub {
+    font-size: 0.9375rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    margin: 0 0 0.5rem;
+  }
+
+  .redirect-msg {
+    font-size: 0.8125rem;
+    color: var(--text-tertiary);
+    margin-top: 1.25rem;
+  }
+
+  .support-note {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin-top: 1rem;
+  }
+</style>

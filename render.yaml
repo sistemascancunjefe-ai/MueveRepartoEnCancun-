@@ -21,6 +21,15 @@ services:
         value: "20"
       - key: PUBLIC_PRO_PRICE_MXN
         value: "99"
+      # Stripe — clave pública (segura en frontend)
+      - key: PUBLIC_STRIPE_PUBLISHABLE_KEY
+        value: pk_live_51T6oKE2dM2f4HRxoh2mpjFg4MHpHXxqc65ulAos4p22xPpD3v55ejGpiGx1Y8vdK5doYMTPGvTPi6RzsqdVv2xvE000caSvFag
+      - key: PUBLIC_STRIPE_BUY_BUTTON_ID
+        value: buy_btn_1T9Y4E2dM2f4HRxoylh2M7Z4
+      # Stripe — clave secreta (solo servidor, NO en PUBLIC_)
+      # Añadir manualmente en Render Dashboard → Environment → STRIPE_SECRET_KEY
+      - key: STRIPE_SECRET_KEY
+        sync: false
     autoDeploy: true
 
   - type: web

@@ -69,3 +69,15 @@ export function getRepartidorName(): string {
 export function setRepartidorName(name: string): void {
   localStorage.setItem(KEYS.NAME, name);
 }
+
+/** Activa plan pro localmente (llamar solo después de verificar pago server-side). */
+export function setPro(stripeSessionId?: string): void {
+  localStorage.setItem(KEYS.PLAN, 'pro');
+  if (stripeSessionId) localStorage.setItem('mr-stripe-session', stripeSessionId);
+}
+
+/** Desactiva pro (solo admin / soporte). */
+export function setFree(): void {
+  localStorage.setItem(KEYS.PLAN, 'free');
+  localStorage.removeItem('mr-stripe-session');
+}
