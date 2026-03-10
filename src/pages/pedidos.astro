@@ -735,9 +735,11 @@ import MainLayout from '../layouts/MainLayout.astro';
         const targetId = filtered[dropIndex].id;
 
         // Reorder logic en filtered
-        // When dragging downward the splice shifts indices, so adjust insertion point
+        // When dragging downward the splice shifts indices, so adjust insertion point.
+        // After the splice filtered.length = N-1; if dropIndex === filtered.length the
+        // drop was on the last card, so skip the -1 adjustment to allow end-of-list placement.
         const item = filtered.splice(dragIndex, 1)[0];
-        const insertAt = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        const insertAt = (dragIndex < dropIndex && dropIndex < filtered.length) ? dropIndex - 1 : dropIndex;
         filtered.splice(insertAt, 0, item);
 
         // Update orders to match new positions
@@ -754,8 +756,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 
           if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
             const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
-            // Adjust for direction shift, mirroring the filtered reorder adjustment
-            const allInsertAt = allStopsItemIndex < allStopsTargetIndex ? allStopsTargetIndex - 1 : allStopsTargetIndex;
+            // Adjust for direction shift, mirroring the filtered reorder adjustment.
+            // After the splice allStops.length = M-1; if target index equals allStops.length
+            // the drop was on the last item, so skip the -1 to allow end-of-list placement.
+            const allInsertAt = (allStopsItemIndex < allStopsTargetIndex && allStopsTargetIndex < allStops.length) ? allStopsTargetIndex - 1 : allStopsTargetIndex;
             allStops.splice(allInsertAt, 0, removedItem);
 
             const promises = allStops.map((stop, idx) => {
