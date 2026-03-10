@@ -68,14 +68,14 @@ export const migrateBalanceFromLocalStorage = async (db: Awaited<ReturnType<type
     const muevecancunBalance = localStorage.getItem('muevecancun_balance');
     if (muevecancunBalance !== null) {
       localBalance = parseFloat(muevecancunBalance);
-      }
+    }
 
     // Try user_balance if muevecancun_balance not found
     if (localBalance === null || isNaN(localBalance)) {
       const userBalance = localStorage.getItem('user_balance');
       if (userBalance !== null) {
         localBalance = parseFloat(userBalance);
-        }
+      }
     }
 
     const existing = await store.get('current_balance');

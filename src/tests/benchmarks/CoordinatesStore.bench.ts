@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import { bench, describe, beforeAll } from 'vitest';
+import { bench, describe } from 'vitest';
 import { CoordinatesStore } from '../../utils/CoordinatesStore';
 
 // Use a fresh CoordinatesStore instance for benchmarking to avoid interference from the shared singleton.
