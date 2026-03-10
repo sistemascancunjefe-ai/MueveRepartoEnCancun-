@@ -60,6 +60,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div class="mode-tabs" role="group" aria-label="Modo de captura">
     <button class="mode-tab active" data-mode="text"   aria-pressed="true">Texto</button>
     <button class="mode-tab"        data-mode="coords" aria-pressed="false">Coords</button>
+    <button class="mode-tab"        data-mode="ocr"    aria-pressed="false">OCR</button>
     <button class="mode-tab"        data-mode="link"   aria-pressed="false">Link</button>
     <button class="mode-tab"        data-mode="qr"     aria-pressed="false">QR</button>
   </div>
@@ -91,6 +92,48 @@ import MainLayout from '../layouts/MainLayout.astro';
       Usar mi ubicación
     </button>
     <input id="input-address-from-coords" type="hidden" />
+  </div>
+
+  <!-- OCR mode -->
+  <div id="mode-ocr" class="mode-panel" style="display:none;">
+    <div style="background:var(--surface-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:1rem;text-align:center;">
+      <p style="font-size:0.875rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem;">Escanear Captura de Pantalla</p>
+
+      <div style="margin-bottom:1rem;">
+        <input type="file" id="ocr-input-file" accept="image/*" style="display:none;" />
+        <button id="btn-ocr-take-photo" class="btn-secondary btn-md" style="margin:0 auto; display:flex; gap:0.5rem; align-items:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
+          Seleccionar o Tomar Foto
+        </button>
+      </div>
+
+      <div id="ocr-preview-container" style="display:none; margin-bottom:1rem;">
+        <img id="ocr-preview-img" src="" alt="Preview" style="max-width:100%; max-height:200px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);" />
+      </div>
+
+      <button id="btn-ocr-extract" class="btn-primary btn-sm" style="margin:0 auto; display:none;">
+        Extraer dirección
+      </button>
+
+      <div id="ocr-progress-container" style="display:none; margin-top:1rem;">
+        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">
+          <span id="ocr-progress-status">Inicializando...</span>
+          <span id="ocr-progress-percentage">0%</span>
+        </div>
+        <div style="width:100%; background:var(--surface-input); height:6px; border-radius:3px; overflow:hidden;">
+          <div id="ocr-progress-bar" style="width:0%; height:100%; background:var(--color-primary); transition:width 0.2s;"></div>
+        </div>
+      </div>
+
+      <div id="ocr-result-container" style="display:none; margin-top:1rem; text-align:left;">
+        <label class="field-label">Texto Extraído</label>
+        <textarea id="ocr-textarea-result" class="input" rows="3" style="resize:vertical; border-radius:var(--radius-md); font-size:0.8125rem; font-family:monospace; margin-bottom:0.5rem;"></textarea>
+        <button id="btn-ocr-use-address" class="btn-secondary btn-sm" style="width:100%;">
+          Usar esta dirección
+        </button>
+      </div>
+
+    </div>
   </div>
 
   <!-- Link mode -->
@@ -560,6 +603,123 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
 
+  // -- Address Autocomplete State --
+  let currentCoords: { lat: number, lng: number } | null = null;
+  let autocompleteTimeout: number | undefined;
+  let searchToken = 0;
+
+  // Returns Nominatim results array, { serviceUnavailable: true } on 429/503, or [] on other errors.
+  async function geocodeAddress(query: string): Promise<any[] | { serviceUnavailable: true }> {
+    try {
+      // Add Cancun to query if not present to improve local results
+      const q = query.toLowerCase().includes('cancun') || query.toLowerCase().includes('cancún')
+        ? query
+        : `${query}, Cancún`;
+
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
+      const res = await fetch(url, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      if (res.status === 429 || res.status === 503) {
+        return { serviceUnavailable: true };
+      }
+      if (!res.ok) throw new Error('Network response was not ok');
+      return await res.json();
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      return [];
+    }
+  }
+
+  function renderSuggestions(results: any[] | { serviceUnavailable: true }) {
+    const container = document.getElementById('address-suggestions');
+    const warning = document.getElementById('address-warning');
+    if (!container || !warning) return;
+
+    container.innerHTML = '';
+
+    if (!Array.isArray(results) && (results as any).serviceUnavailable) {
+      container.style.display = 'none';
+      warning.textContent = '⚠️ Servicio de geocodificación no disponible. Inténtalo de nuevo más tarde.';
+      warning.style.display = 'block';
+      return;
+    }
+
+    const arr = results as any[];
+    if (arr.length === 0) {
+      container.style.display = 'none';
+      warning.textContent = '⚠️ Dirección no encontrada. Se guardará sin mapa.';
+      warning.style.display = 'block';
+      return;
+    }
+
+    warning.style.display = 'none';
+
+    arr.forEach(res => {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      div.setAttribute('role', 'option');
+      div.tabIndex = 0;
+
+      const primary = document.createElement('div');
+      primary.className = 'suggestion-primary';
+      const name = res.address?.road ? `${res.address.road}${res.address.house_number ? ' ' + res.address.house_number : ''}` : res.name;
+      primary.textContent = name || res.display_name.split(',')[0];
+
+      const secondary = document.createElement('div');
+      secondary.className = 'suggestion-secondary';
+      secondary.textContent = res.display_name;
+
+      div.appendChild(primary);
+      div.appendChild(secondary);
+
+      div.addEventListener('click', () => {
+        const input = document.getElementById('input-address') as HTMLTextAreaElement;
+        input.value = res.display_name;
+        currentCoords = { lat: parseFloat(res.lat), lng: parseFloat(res.lon) };
+        container.style.display = 'none';
+        updateSaveBtn();
+      });
+
+      // Also handle enter key for accessibility
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          div.click();
+        }
+      });
+
+      container.appendChild(div);
+    });
+
+    container.style.display = 'block';
+  }
+
+  function handleAddressInput(e: Event) {
+    const val = (e.target as HTMLTextAreaElement).value.trim();
+    const container = document.getElementById('address-suggestions');
+    const warning = document.getElementById('address-warning');
+
+    // Reset coords when typing manually
+    currentCoords = null;
+
+    if (!val || val.length < 3) {
+      if (container) container.style.display = 'none';
+      if (warning) warning.style.display = 'none';
+      clearTimeout(autocompleteTimeout);
+      return;
+    }
+
+    clearTimeout(autocompleteTimeout);
+    autocompleteTimeout = window.setTimeout(async () => {
+      const token = ++searchToken;
+      const results = await geocodeAddress(val);
+      // Discard stale responses
+      if (token !== searchToken) return;
+      renderSuggestions(results);
+    }, 500);
+  }
+
+
   // ── Render ──
   async function renderStops() {
     allStops = await getStops();
@@ -638,6 +798,84 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // Bind events on stop cards
     listEl.querySelectorAll('.stop-card').forEach(card => {
+      // Drag and Drop
+      card.addEventListener('dragstart', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        const index = target.dataset.index;
+        if (index === null || index === undefined) return;
+        e.dataTransfer.setData('text/plain', index);
+        e.dataTransfer.effectAllowed = 'move';
+        target.classList.add('dragging');
+      });
+
+      card.addEventListener('dragend', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('dragging');
+        // Clear any lingering drag-over states (e.g. cancelled drag)
+        listEl.querySelectorAll('.stop-card.drag-over').forEach((el: Element) => {
+          el.classList.remove('drag-over');
+        });
+      });
+
+      card.addEventListener('dragover', (e: any) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('drag-over');
+      });
+
+      card.addEventListener('dragleave', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+      });
+
+      card.addEventListener('drop', async (e: any) => {
+        e.preventDefault();
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+
+        const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const dropIndex = parseInt(target.getAttribute('data-index')!, 10);
+
+        if (dragIndex === dropIndex || isNaN(dragIndex) || isNaN(dropIndex)) return;
+
+        // Identificamos el id del elemento donde se soltó ANTES de reordenar
+        const targetId = filtered[dropIndex].id;
+
+        // Reorder logic en filtered
+        // When dragging downward the splice shifts indices, so adjust insertion point
+        const item = filtered.splice(dragIndex, 1)[0];
+        const insertAt = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        filtered.splice(insertAt, 0, item);
+
+        // Update orders to match new positions
+        if (currentFilter === 'all') {
+          const promises = filtered.map((stop, idx) => {
+            stop.order = idx;
+            return dbPut(STORES.STOPS, stop);
+          });
+          await Promise.all(promises);
+        } else {
+          // Si estamos filtrando, buscar su índice en allStops
+          const allStopsItemIndex = allStops.findIndex(s => s.id === item.id);
+          const allStopsTargetIndex = allStops.findIndex(s => s.id === targetId);
+
+          if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
+            const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
+            // Adjust for direction shift, mirroring the filtered reorder adjustment
+            const allInsertAt = allStopsItemIndex < allStopsTargetIndex ? allStopsTargetIndex - 1 : allStopsTargetIndex;
+            allStops.splice(allInsertAt, 0, removedItem);
+
+            const promises = allStops.map((stop, idx) => {
+              stop.order = idx;
+              return dbPut(STORES.STOPS, stop);
+            });
+            await Promise.all(promises);
+          }
+        }
+
+        await renderStops();
+      });
       card.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.closest('.stop-action-btn')) return;
@@ -995,12 +1233,16 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── Mode tabs ──
   function switchMode(mode: string) {
+
+    if (currentMode === 'ocr' && mode !== 'ocr') {
+      cleanupOcr();
+    }
     currentMode = mode;
     document.querySelectorAll('.mode-tab').forEach(t => {
       t.classList.toggle('active', (t as HTMLElement).dataset.mode === mode);
       (t as HTMLButtonElement).setAttribute('aria-pressed', String((t as HTMLElement).dataset.mode === mode));
     });
-    ['text','coords','link','qr'].forEach(m => {
+    ['text','coords','ocr','link','qr'].forEach(m => {
       const panel = document.getElementById(`mode-${m}`)!;
       panel.style.display = m === mode ? 'block' : 'none';
     });
@@ -1153,6 +1395,122 @@ import MainLayout from '../layouts/MainLayout.astro';
         updateSaveBtn();
       });
     });
+
+
+    // OCR tab events
+    const ocrInputFile = document.getElementById('ocr-input-file') as HTMLInputElement;
+    const btnTakePhoto = document.getElementById('btn-ocr-take-photo');
+    const previewContainer = document.getElementById('ocr-preview-container');
+    const previewImg = document.getElementById('ocr-preview-img') as HTMLImageElement;
+    const btnExtract = document.getElementById('btn-ocr-extract');
+    const progressContainer = document.getElementById('ocr-progress-container');
+    const resultContainer = document.getElementById('ocr-result-container');
+
+    if (btnTakePhoto) {
+      btnTakePhoto.addEventListener('click', () => {
+        ocrInputFile?.click();
+      });
+    }
+
+    if (ocrInputFile) {
+      ocrInputFile.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          // Revoke any previously tracked blob URL before creating a new one
+          if (currentPreviewUrl) {
+            URL.revokeObjectURL(currentPreviewUrl);
+          }
+          const url = URL.createObjectURL(file);
+          currentPreviewUrl = url;
+          if (previewImg) {
+            previewImg.src = url;
+            previewImg.onload = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+            previewImg.onerror = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+          }
+          if (previewContainer) previewContainer.style.display = 'block';
+          if (btnExtract) btnExtract.style.display = 'block';
+          if (progressContainer) progressContainer.style.display = 'none';
+          if (resultContainer) resultContainer.style.display = 'none';
+        }
+      });
+    }
+
+    if (btnExtract) {
+      btnExtract.addEventListener('click', () => {
+        extractOcrText();
+      });
+    }
+
+    const btnUseAddress = document.getElementById('btn-ocr-use-address');
+    if (btnUseAddress) {
+      btnUseAddress.addEventListener('click', () => {
+        const text = (document.getElementById('ocr-textarea-result') as HTMLTextAreaElement).value;
+        if (!text) return;
+
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        // Extract phone number (e.g., 10 digits)
+        const phoneRegex = /(?:\+?52)?(?:\s*-)?(?:\d[\s-]?){10}/;
+        const phoneMatch = text.match(phoneRegex);
+        if (phoneMatch) {
+            const inputPhone = document.getElementById('input-client-phone') as HTMLInputElement;
+            if (inputPhone) inputPhone.value = phoneMatch[0].replace(/[\s-]/g, '').slice(-10);
+        }
+
+        // Try to identify Name and Address heuristically
+        // E.g., if line 1 has no numbers it might be the name.
+        // If line 2 has numbers and street names (Calle, Av, SM, Mz, Lt), it's the address.
+        let potentialAddress = "";
+        let potentialName = "";
+        let notes = "";
+
+        for (const line of lines) {
+           const lower = line.toLowerCase();
+           if (lower.includes('calle') || lower.includes('av') || lower.includes('sm') || lower.includes('mz') || lower.includes('lt') || lower.includes('mza') || lower.includes('lote') || lower.includes('c.')) {
+              if (potentialAddress.length > 0) potentialAddress += " " + line;
+              else potentialAddress = line;
+           } else if (line.length > 2 && line.length < 40 && !phoneRegex.test(line) && potentialName === "") {
+              // Could be name if no address keywords and no phone number
+              potentialName = line;
+           } else {
+              if (!line.match(phoneRegex)) {
+                  notes += line + " ";
+              }
+           }
+        }
+
+        if (!potentialAddress) {
+            // If heuristics fail, just use the first non-phone line as address
+            potentialAddress = lines.find(l => !l.match(phoneRegex) && l !== potentialName) || text;
+        }
+
+        const inputAddress = document.getElementById('input-address') as HTMLTextAreaElement;
+        if (inputAddress) {
+            inputAddress.value = potentialAddress.trim();
+            // Trigger input event for validation
+            inputAddress.dispatchEvent(new Event('input'));
+        }
+
+        const inputName = document.getElementById('input-client-name') as HTMLInputElement;
+        if (inputName && potentialName) {
+            inputName.value = potentialName.trim();
+        }
+
+        const inputNote = document.getElementById('input-note') as HTMLInputElement;
+        if (inputNote && notes.trim().length > 0) {
+            inputNote.value = notes.trim().substring(0, 100);
+        }
+
+        switchMode('text');
+      });
+    }
+
 
     renderStops();
     setTimeout(() => geocodePendingStops(), 2000);

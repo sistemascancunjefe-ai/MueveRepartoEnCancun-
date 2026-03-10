@@ -128,6 +128,48 @@ export async function dbPut<T>(store: string, value: T): Promise<void> {
   });
 }
 
+export async function dbPutMany<T>(store: string, values: T[]): Promise<void> {
+  if (values.length === 0) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+    // durability:'relaxed' skips the OS-level fsync on each write,
+    // significantly improving throughput for bulk inserts/updates.
+    const tx = db.transaction(store, 'readwrite', { durability: 'relaxed' });
+    const os = tx.objectStore(store);
+
+    // Guard against multiple rejection calls when both tx.onerror and
+    // tx.onabort fire for the same failure, or when the sync try/catch
+    // and an async request error both attempt to reject.
+    let settled = false;
+    const rejectOnce = (err: unknown) => {
+      if (!settled) { settled = true; reject(err); }
+    };
+
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => rejectOnce(tx.error);
+    tx.onabort    = () => rejectOnce(tx.error ?? new Error('IndexedDB transaction aborted'));
+
+    try {
+      for (const v of values) {
+        const req = os.put(v);
+        // Catch per-request errors early and stop them from bubbling to
+        // tx.onerror, avoiding a second rejectOnce call for the same failure.
+        req.onerror = (e) => {
+          e.stopPropagation();
+          rejectOnce(req.error);
+          try { tx.abort(); } catch { /* tx may already be aborting */ }
+        };
+      }
+    } catch (err) {
+      rejectOnce(err);
+      try { tx.abort(); } catch { /* ignore */ }
+    }
+  });
+}
+
 export async function dbGet<T>(store: string, key: string): Promise<T | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
