@@ -165,7 +165,7 @@ Ver [`ROADMAP.md`](ROADMAP.md) y [`docs/ROADMAP.md`](docs/ROADMAP.md) para el ro
 - [x] **P3.2** — QR Scanner (jsQR) + OCR (Tesseract.js)
 - [x] **P3.3** — Backend Rust/Axum + PostgreSQL en Render
 - [x] **P4** — Autocompletar de direcciones (dropdown Nominatim)
-- [x] **P5** — Auth OTP + JWT + Plan Free/Pro
+- [ ] **P5** — Auth OTP + JWT + Plan Free/Pro (parcial / pendiente: backend `/auth/*` + OTP/Twilio)
 - [ ] **P5.2** — Pagos Conekta (Free → Pro upgrade) 🔴 Pendiente inmediato
 - [ ] **P6** — Modo Empresa (múltiples repartidores) 🟡
 - [ ] **P7** — Integraciones externas (WhatsApp API, CSV import) 🟢
