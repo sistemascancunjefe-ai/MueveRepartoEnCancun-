@@ -895,7 +895,7 @@ const ui = uiTranslations[currentLang];
                  let showTimeBadge = false;
 
                  if (best) {
-                     let duration = best.duration_minutes || 0;
+                     const duration = best.duration_minutes || 0;
                      timeText = `${fastestLabel}: ${duration}min`;
                      showTimeBadge = true;
                  }
