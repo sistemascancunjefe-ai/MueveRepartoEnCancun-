@@ -142,22 +142,22 @@
 
 ---
 
-## P5 — Auth OTP + Plan Free/Pro ✅
+## P5 — Auth OTP + Plan Free/Pro 🟡
 
-**Estado:** Completado (implementación real — Jules entregó stubs, Claude implementó)
+**Estado:** Parcial — migración SQL + UI listas; backend OTP/JWT y Render env vars PENDIENTES
 **Objetivo:** Identificación del repartidor + límite de paradas por plan
 
-### Tareas completadas
+### Tareas
 - [x] Migración `002_auth.sql` — tablas `users`, `otp_attempts`, `subscriptions`
-- [x] `backend/src/routes/auth.rs` — `POST /auth/send-otp`, `POST /auth/verify-otp`, `GET /auth/me`
-- [x] `backend/src/middleware/auth.rs` — extractor `AuthUser` para rutas protegidas
-- [x] Rate limiting OTP: 3 intentos/hora por teléfono
-- [x] JWT de 72 horas con claims `sub` (user_id), `phone`, `plan`
+- [ ] `backend/src/routes/auth.rs` — `POST /auth/send-otp`, `POST /auth/verify-otp`, `GET /auth/me` (implementación real pendiente)
+- [ ] `backend/src/middleware/auth.rs` — extractor `AuthUser` para rutas protegidas (pendiente)
+- [ ] Rate limiting OTP: 3 intentos/hora por teléfono (pendiente)
+- [ ] JWT de 72 horas con claims `sub` (user_id), `phone`, `plan` (actualmente 30 días)
 - [x] `src/pages/auth.astro` — formulario teléfono → OTP 6 dígitos → JWT localStorage
 - [x] `src/pages/suscripcion.astro` — comparativa Free/Pro con CTA
-- [x] Paywall frontend en `/pedidos`: límite 20 paradas/día en plan Free
+- [x] Paywall frontend en `/pedidos`: límite 20 paradas/día en plan Free (requiere 402 en backend)
 - [x] Badge de plan en `MainLayout.astro` (Free / Pro)
-- [x] Variables de entorno `JWT_SECRET`, `TWILIO_*` en `render.yaml`
+- [ ] Variables de entorno `JWT_SECRET`, `TWILIO_*` en `render.yaml` (no definidas aún)
 
 ### Criterios de aceptación ✅
 - El repartidor se registra con número de teléfono en < 60 segundos
