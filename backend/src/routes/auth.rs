@@ -97,7 +97,7 @@ pub async fn send_magic_link(
     );
 
     let body = json!({
-        "from": "Mueve Reparto <noreply@muevereparto.com>",
+        "from": "Mueve Reparto <onboarding@resend.dev>",
         "to": [email],
         "subject": "Entra a Mueve Reparto",
         "html": email_html,
