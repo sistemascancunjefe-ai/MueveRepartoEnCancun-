@@ -11,6 +11,9 @@ mod db;
 mod middleware;
 mod models;
 mod routes;
+mod state;
+
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -25,6 +28,12 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let pool = db::create_pool().await?;
+
+    let jwt_secret: std::sync::Arc<str> = env::var("JWT_SECRET")
+        .expect("JWT_SECRET must be set")
+        .into();
+
+    let app_state = AppState { pool, jwt_secret };
 
     let allowed_origin = env::var("ALLOWED_ORIGINS")
         .unwrap_or_else(|_| "https://mueverepartoencancun.onrender.com".to_string());
@@ -46,22 +55,16 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
-        // Auth P5
-        .route("/auth/send-otp",    post(routes::auth::send_otp))
-        .route("/auth/verify-otp",  post(routes::auth::verify_otp))
-        .route("/auth/me",          get(routes::auth::me))
-        // Stops
         .route("/stops", get(routes::stops::list_stops))
         .route("/stops", post(routes::stops::create_stop))
         .route("/stops/sync", post(routes::stops::sync_stops))
         .route("/stops/:id", patch(routes::stops::update_stop))
         .route("/stops/:id", delete(routes::stops::delete_stop))
-        // Stats
         .route("/stats", get(routes::stats::get_stats))
         .route("/stats", post(routes::stats::upsert_stats))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .with_state(app_state);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())

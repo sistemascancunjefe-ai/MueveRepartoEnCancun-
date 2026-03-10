@@ -207,19 +207,20 @@ import MainLayout from '../layouts/MainLayout.astro';
       <p style="font-size:0.8125rem;color:var(--text-secondary);margin:0;">Analizando texto...</p>
     </div>
 
-    <!-- Resultado del escaneo -->
-    <div id="scan-result" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--color-primary-light);border:1px solid var(--color-primary);border-radius:var(--radius-lg);">
-      <p style="font-size:0.75rem;font-weight:700;color:var(--text-brand);margin:0 0 0.375rem;">Datos detectados — revisa y edita:</p>
-      <div id="scan-result-content" style="font-size:0.8125rem;color:var(--text-secondary);"></div>
-      <button id="btn-apply-scan" class="btn-primary btn-sm" style="width:100%;margin-top:0.625rem;">
-        Usar estos datos
-      </button>
-      <button id="btn-discard-scan" class="btn-secondary btn-sm" style="width:100%;margin-top:0.375rem;">
-        Descartar
-      </button>
-    </div>
-
   </div>
+
+  <!-- Resultado del escaneo -->
+  <div id="scan-result" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--color-primary-light);border:1px solid var(--color-primary);border-radius:var(--radius-lg);">
+    <p style="font-size:0.75rem;font-weight:700;color:var(--text-brand);margin:0 0 0.375rem;">Datos detectados — revisa y edita:</p>
+    <div id="scan-result-content" style="font-size:0.8125rem;color:var(--text-secondary);"></div>
+    <button id="btn-apply-scan" class="btn-primary btn-sm" style="width:100%;margin-top:0.625rem;">
+      Usar estos datos
+    </button>
+    <button id="btn-discard-scan" class="btn-secondary btn-sm" style="width:100%;margin-top:0.375rem;">
+      Descartar
+    </button>
+  </div>
+
 </div>
 
   <!-- Common fields -->
@@ -306,16 +307,10 @@ import MainLayout from '../layouts/MainLayout.astro';
   let qrAnimFrame: number | null = null;
   let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number } = {};
 
-  // Cargar jsQR desde CDN solo cuando se activa el modo QR
+  // Cargar jsQR desde el bundle (instalado como dependencia npm)
   async function loadJsQR(): Promise<any> {
-    if ((window as any).jsQR) return (window as any).jsQR;
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-      s.onload = () => resolve((window as any).jsQR);
-      s.onerror = () => reject(new Error('No se pudo cargar jsQR'));
-      document.head.appendChild(s);
-    });
+    const mod = await import('jsqr');
+    return mod.default;
   }
 
   async function startQRScanner() {
@@ -391,14 +386,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── OCR Scanner ──
   async function loadTesseract(): Promise<any> {
-    if ((window as any).Tesseract) return (window as any).Tesseract;
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      s.onload = () => resolve((window as any).Tesseract);
-      s.onerror = () => reject(new Error('No se pudo cargar Tesseract'));
-      document.head.appendChild(s);
-    });
+    const mod = await import('tesseract.js');
+    return mod.default ?? mod;
   }
 
   async function runOCR(imageSource: string | File) {
@@ -469,15 +458,15 @@ import MainLayout from '../layouts/MainLayout.astro';
     const contentEl = document.getElementById('scan-result-content')!;
 
     const rows = [
-      parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${parsed.address}</div>` : '',
-      parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${parsed.clientName}</div>` : '',
-      parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${parsed.clientPhone}</div>` : '',
-      parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${parsed.income}</div>` : '',
-      parsed.note       ? `<div>📝 <strong>Nota:</strong> ${parsed.note}</div>` : '',
+      parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${escapeHtml(parsed.address)}</div>` : '',
+      parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${escapeHtml(parsed.clientName)}</div>` : '',
+      parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${escapeHtml(parsed.clientPhone)}</div>` : '',
+      parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${escapeHtml(String(parsed.income))}</div>` : '',
+      parsed.note       ? `<div>📝 <strong>Nota:</strong> ${escapeHtml(parsed.note)}</div>` : '',
     ].filter(Boolean);
 
     if (rows.length === 0) {
-      contentEl.innerHTML = `<p style="color:var(--text-tertiary);">No se detectaron datos reconocibles. Texto crudo:<br/><code style="font-size:0.7rem;">${rawText.slice(0, 100)}</code></p>`;
+      contentEl.innerHTML = `<p style="color:var(--text-tertiary);">No se detectaron datos reconocibles. Texto crudo:<br/><code style="font-size:0.7rem;">${escapeHtml(rawText.slice(0, 100))}</code></p>`;
     } else {
       contentEl.innerHTML = rows.join('');
     }
@@ -599,7 +588,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     clearTimeout(autocompleteTimeout);
     autocompleteTimeout = window.setTimeout(async () => {
       const token = ++searchToken;
-      const results = await geocodeAddress(val);
+      const results = await fetchGeocodeSuggestions(val);
       // Discard stale responses
       if (token !== searchToken) return;
       renderSuggestions(results);
@@ -654,10 +643,8 @@ import MainLayout from '../layouts/MainLayout.astro';
           <p class="stop-address">${escapeHtml(s.address)}</p>
           ${s.note ? `<p class="stop-meta">${escapeHtml(s.note)}</p>` : ''}
           ${s.clientName ? `<p class="stop-meta">${escapeHtml(s.clientName)}${s.clientPhone ? ' · ' + escapeHtml(s.clientPhone) : ''}</p>` : ''}
-          <span id="geo-${s.id}" class="geo-indicator" style="display:none;font-size:0.75rem;color:var(--text-tertiary);align-items:center;gap:0.25rem;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
-              <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-            </svg>
+          <span id="geo-${s.id}" class="geo-indicator" style="display:none;align-items:center;gap:0.375rem;font-size:0.6875rem;color:var(--text-tertiary);font-weight:600;">
+            <svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
             Buscando coords...
           </span>
         </div>
@@ -730,9 +717,11 @@ import MainLayout from '../layouts/MainLayout.astro';
         const targetId = filtered[dropIndex].id;
 
         // Reorder logic en filtered
-        // When dragging downward the splice shifts indices, so adjust insertion point
+        // When dragging downward the splice shifts indices, so adjust insertion point.
+        // After the splice filtered.length = N-1; if dropIndex === filtered.length the
+        // drop was on the last card, so skip the -1 adjustment to allow end-of-list placement.
         const item = filtered.splice(dragIndex, 1)[0];
-        const insertAt = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        const insertAt = (dragIndex < dropIndex && dropIndex < filtered.length) ? dropIndex - 1 : dropIndex;
         filtered.splice(insertAt, 0, item);
 
         // Update orders to match new positions
@@ -749,8 +738,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 
           if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
             const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
-            // Adjust for direction shift, mirroring the filtered reorder adjustment
-            const allInsertAt = allStopsItemIndex < allStopsTargetIndex ? allStopsTargetIndex - 1 : allStopsTargetIndex;
+            // Adjust for direction shift, mirroring the filtered reorder adjustment.
+            // After the splice allStops.length = M-1; if target index equals allStops.length
+            // the drop was on the last item, so skip the -1 to allow end-of-list placement.
+            const allInsertAt = (allStopsItemIndex < allStopsTargetIndex && allStopsTargetIndex < allStops.length) ? allStopsTargetIndex - 1 : allStopsTargetIndex;
             allStops.splice(allInsertAt, 0, removedItem);
 
             const promises = allStops.map((stop, idx) => {
@@ -956,11 +947,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         const lng = (document.getElementById('input-lng') as HTMLInputElement).value.trim();
         return lat && lng ? `${lat}, ${lng}` : '';
       }
-      case 'link': {
-        const raw = (document.getElementById('input-link') as HTMLInputElement).value.trim();
-        linkCoords = parseCoordsFromMapUrl(raw);
-        return raw;
-      }
+      case 'link': return (document.getElementById('input-link') as HTMLInputElement).value.trim();
       case 'qr': return scannedData.address || '';
       default: return '';
     }
@@ -989,9 +976,6 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (currentMode === 'text' && currentCoords) {
       finalLat = currentCoords.lat;
       finalLng = currentCoords.lng;
-    } else if (currentMode === 'link' && linkCoords) {
-      finalLat = linkCoords.lat;
-      finalLng = linkCoords.lng;
     } else {
       const latStr = (document.getElementById('input-lat') as HTMLInputElement).value;
       const lngStr = (document.getElementById('input-lng') as HTMLInputElement).value;
@@ -1152,6 +1136,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
   }
 
+  // ── Init ──
   function init() {
     // QR Scanner events
     document.getElementById('btn-start-qr')?.addEventListener('click', startQRScanner);
@@ -1229,7 +1214,6 @@ import MainLayout from '../layouts/MainLayout.astro';
     document.getElementById('paywall-overlay')?.addEventListener('click', closePaywall);
 
     document.getElementById('btn-save-stop')?.addEventListener('click', saveStop);
-
     // Filter tabs
     document.querySelectorAll('.filter-tab').forEach(tab => {
       tab.addEventListener('click', async () => {

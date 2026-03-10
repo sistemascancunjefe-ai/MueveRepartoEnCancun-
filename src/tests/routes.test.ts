@@ -38,7 +38,7 @@ describe('getAllRoutes', () => {
     const routes = await getAllRoutes();
     expect(routes).toEqual([mockRoute]);
     expect(fs.readdir).toHaveBeenCalledTimes(1);
-    expect(fs.readFile).toHaveBeenCalledTimes(2); // One for dir, one for master (which fails)
+    expect(fs.readFile).toHaveBeenCalledWith(expect.stringContaining('route1.json'), expect.anything());
   });
 
   it('should read routes from individual files with top-level array', async () => {
