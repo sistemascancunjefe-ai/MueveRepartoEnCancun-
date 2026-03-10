@@ -73,11 +73,10 @@ import MainLayout from '../layouts/MainLayout.astro';
     <div style="position:relative;">
       <textarea id="input-address" class="input" rows="2"
                 placeholder="Av. Tulum #123, SM 5, Cancún..."
+                aria-describedby="address-warning"
                 style="resize:none;border-radius:var(--radius-lg);"></textarea>
       <div id="address-suggestions" class="suggestions-dropdown" style="display:none;" role="listbox"></div>
-      <p id="address-warning" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;">
-        ⚠️ Dirección no encontrada. Se guardará sin mapa.
-      </p>
+      <p id="address-warning" role="status" aria-live="polite" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;"></p>
     </div>
   </div>
 
