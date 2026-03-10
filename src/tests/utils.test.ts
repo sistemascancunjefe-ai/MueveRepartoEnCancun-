@@ -1,5 +1,32 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, safeJsonStringify, getDistance, truncateText } from '../utils/utils';
+import { escapeHtml, safeJsonStringify, getDistance, truncateText, formatDate, readingTime, safeUrl } from '../utils/utils';
+
+describe('formatDate Utility', () => {
+  it('should format a date correctly as MMM DD, YYYY', () => {
+    const date = new Date(2023, 0, 1); // Jan 1, 2023
+    expect(formatDate(date)).toBe('Jan 01, 2023');
+  });
+
+  it('should handle different months correctly', () => {
+    const dates = [
+      { date: new Date(2023, 1, 14), expected: 'Feb 14, 2023' },
+      { date: new Date(2023, 11, 25), expected: 'Dec 25, 2023' }
+    ];
+    dates.forEach(({ date, expected }) => {
+      expect(formatDate(date)).toBe(expected);
+    });
+  });
+
+  it('should handle leap years correctly', () => {
+    const leapDay = new Date(2024, 1, 29); // Feb 29, 2024
+    expect(formatDate(leapDay)).toBe('Feb 29, 2024');
+  });
+
+  it('should handle single digit days with leading zero', () => {
+    const date = new Date(2023, 4, 5); // May 5, 2023
+    expect(formatDate(date)).toBe('May 05, 2023');
+  });
+});
 
 describe('escapeHtml Utility', () => {
   it('should escape HTML characters in strings', () => {
@@ -142,5 +169,72 @@ describe('truncateText Utility', () => {
     // Cutoff = 1 - 1 = 0
     expect(truncateText('A', 1)).toBe('A');
     expect(truncateText('AB', 1)).toBe('…'); // slice(0, 0) + '…'
+  });
+});
+
+
+
+describe('readingTime Utility', () => {
+  it('should calculate 1 min read for empty string', () => {
+    expect(readingTime('')).toBe('1 min read');
+  });
+
+  it('should calculate 1 min read for short plain text', () => {
+    expect(readingTime('Hello world, this is a short text.')).toBe('1 min read');
+  });
+
+  it('should strip HTML tags before calculating word count', () => {
+    const html = '<h1>Title</h1><p>This is a paragraph with <b>HTML</b> tags.</p>';
+    // "TitleThis is a paragraph with HTML tags."
+    // 8 words
+    expect(readingTime(html)).toBe('1 min read');
+  });
+
+  it('should calculate 2 min read for text with 200 words', () => {
+    const text = new Array(200).fill('word').join(' ');
+    expect(readingTime(text)).toBe('2 min read');
+  });
+
+  it('should calculate 3 min read for text with 400 words', () => {
+    const text = new Array(400).fill('word').join(' ');
+    expect(readingTime(text)).toBe('3 min read');
+  });
+
+  it('should round appropriately for intermediate lengths', () => {
+    // 100 words -> 100/200 + 1 = 1.5 -> toFixed() -> "2"
+    const text = new Array(100).fill('word').join(' ');
+    expect(readingTime(text)).toBe('2 min read');
+
+    // 99 words -> 99/200 + 1 = 1.495 -> toFixed() -> "1"
+    const text2 = new Array(99).fill('word').join(' ');
+    expect(readingTime(text2)).toBe('1 min read');
+
+  });
+});
+
+describe('safeUrl Utility', () => {
+  it('should encode string parameters', () => {
+    expect(safeUrl('hello world')).toBe('hello%20world');
+    expect(safeUrl('a&b=c')).toBe('a%26b%3Dc');
+  });
+
+  it('should replace single quotes with %27', () => {
+    // encodeURIComponent replaces ' with ' or leaves it unescaped depending on implementation
+    // our function explicitly replaces it with %27
+    expect(safeUrl("it's a test")).toBe('it%27s%20a%20test');
+    expect(safeUrl("'quoted'")).toBe('%27quoted%27');
+  });
+
+  it('should return empty string for non-string inputs', () => {
+    expect(safeUrl(null)).toBe('');
+    expect(safeUrl(undefined)).toBe('');
+    expect(safeUrl(123)).toBe('');
+    expect(safeUrl(true)).toBe('');
+    expect(safeUrl({})).toBe('');
+    expect(safeUrl([])).toBe('');
+  });
+
+  it('should handle empty string correctly', () => {
+    expect(safeUrl('')).toBe('');
   });
 });
