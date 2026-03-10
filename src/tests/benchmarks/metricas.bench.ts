@@ -30,7 +30,7 @@ const weekDays = Array.from({ length: 7 }, (_, i) => {
 
 describe('metricas optimization', () => {
   bench('original', () => {
-    const dayCounts = weekDays.map(day => ({
+    void weekDays.map(day => ({
       day,
       count:  stops.filter(s => s.status === 'completed' && s.completedAt && isSameDay(day, s.completedAt)).length,
       income: stops.filter(s => s.status === 'completed' && s.completedAt && isSameDay(day, s.completedAt))
@@ -40,7 +40,7 @@ describe('metricas optimization', () => {
 
   bench('optimized - pre-filter and for...of loop', () => {
     const completedStops = stops.filter(s => s.status === 'completed' && s.completedAt);
-    const dayCounts = weekDays.map(day => {
+    void weekDays.map(day => {
       let count = 0;
       let income = 0;
       for (const s of completedStops) {
