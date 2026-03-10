@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS stops (
 
 CREATE INDEX IF NOT EXISTS idx_stops_status ON stops (status);
 CREATE INDEX IF NOT EXISTS idx_stops_user_status ON stops (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_stops_user_created ON stops (user_id, created_at ASC, id ASC);
 
 CREATE TABLE IF NOT EXISTS daily_stats (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),

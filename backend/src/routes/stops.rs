@@ -46,7 +46,6 @@ pub async fn sync_stops(
                 completed_at = EXCLUDED.completed_at,
                 notes        = EXCLUDED.notes,
                 income       = EXCLUDED.income
-            WHERE stops.user_id = EXCLUDED.user_id
             "#,
             stop.id,
             user_id,

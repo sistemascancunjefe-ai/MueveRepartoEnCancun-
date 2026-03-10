@@ -32,8 +32,9 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = db::create_pool().await?;
 
-    let jwt_secret = env::var("JWT_SECRET")
-        .expect("JWT_SECRET must be set");
+    let jwt_secret: std::sync::Arc<str> = env::var("JWT_SECRET")
+        .expect("JWT_SECRET must be set")
+        .into();
 
     let app_state = AppState { pool, jwt_secret };
 
@@ -46,6 +47,7 @@ async fn main() -> anyhow::Result<()> {
         .allow_headers([
             HeaderName::from_static("content-type"),
             HeaderName::from_static("authorization"),
+            HeaderName::from_static("x-device-id"),
         ]);
 
     let app = Router::new()
