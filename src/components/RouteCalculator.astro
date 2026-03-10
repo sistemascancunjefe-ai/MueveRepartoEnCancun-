@@ -500,6 +500,7 @@ const ui = uiTranslations[currentLang];
       container.appendChild(list);
 
       function handleSuggestionClick(e) {
+          if (!(e.target instanceof Element)) return;
           const li = e.target.closest('li[data-name]');
           if (!li) return;
 
