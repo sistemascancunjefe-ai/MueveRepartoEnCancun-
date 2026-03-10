@@ -1,19 +1,19 @@
 use axum::{
-    Router,
     http::{HeaderName, HeaderValue, Method},
     routing::{delete, get, patch, post},
+    Router,
 };
 use std::{env, net::SocketAddr};
-use tower_http::{
-    cors::CorsLayer,
-    trace::TraceLayer,
-};
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod db;
 mod middleware;
 mod models;
 mod routes;
+mod state;
+
+use state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,47 +22,56 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+                .unwrap_or_else(|_| "info,mueve_reparto_api=debug".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     let pool = db::create_pool().await?;
 
-    // CORS: solo el origen del frontend configurado; nunca Any en producción
+    let jwt_secret: std::sync::Arc<str> = env::var("JWT_SECRET")
+        .expect("JWT_SECRET must be set")
+        .into();
+
+    let app_state = AppState { pool, jwt_secret };
+
     let allowed_origin = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "http://localhost:4321".to_string());
+        .unwrap_or_else(|_| "https://mueverepartoencancun.onrender.com".to_string());
 
     let cors = CorsLayer::new()
         .allow_origin(allowed_origin.parse::<HeaderValue>()?)
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
         .allow_headers([
             HeaderName::from_static("content-type"),
             HeaderName::from_static("x-device-id"),
+            HeaderName::from_static("authorization"),
         ]);
 
     let app = Router::new()
-        // Health check (sin auth, para Render health checks)
         .route("/health", get(|| async { "OK" }))
-        // Stops
-        .route("/stops",      get(routes::stops::list_stops))
-        .route("/stops",      post(routes::stops::create_stop))
+        .route("/stops", get(routes::stops::list_stops))
+        .route("/stops", post(routes::stops::create_stop))
         .route("/stops/sync", post(routes::stops::sync_stops))
-        .route("/stops/:id",  patch(routes::stops::update_stop))
-        .route("/stops/:id",  delete(routes::stops::delete_stop))
-        // Stats
-        .route("/stats",      get(routes::stats::get_stats))
-        .route("/stats",      post(routes::stats::upsert_stats))
+        .route("/stops/:id", patch(routes::stops::update_stop))
+        .route("/stops/:id", delete(routes::stops::delete_stop))
+        .route("/stats", get(routes::stats::get_stats))
+        .route("/stats", post(routes::stats::upsert_stats))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(pool);
+        .with_state(app_state);
 
     let port = env::var("PORT")
         .unwrap_or_else(|_| "8080".to_string())
         .parse::<u16>()?;
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    tracing::info!("Mueve Reparto API → {}", addr);
+    tracing::info!("Mueve Reparto API escuchando en {addr}");
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
