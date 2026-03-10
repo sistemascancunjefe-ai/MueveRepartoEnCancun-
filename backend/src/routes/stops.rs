@@ -20,8 +20,8 @@ pub async fn list_stops(
                priority, status, note, income, client_name, client_phone,
                stop_order, created_at, completed_at, notified, synced_at
         FROM stops
-        WHERE device_id = $1
-        ORDER BY stop_order ASC, created_at ASC
+        WHERE user_id = $1
+        ORDER BY created_at ASC, id ASC
         "#,
     )
     .bind(&device_id)
@@ -41,30 +41,6 @@ pub async fn create_stop(
     crate::db::upsert_device(&pool, &device_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    // Paywall: usuarios free tienen límite de paradas diarias activas
-    let plan = auth.as_ref().map(|c| c.plan.as_str()).unwrap_or("free");
-    if plan != "pro" {
-        let free_limit: i64 = env::var("FREE_DAILY_STOP_LIMIT")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(20);
-
-        let active_today: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM stops
-             WHERE device_id = $1
-               AND status NOT IN ('completed', 'failed')
-               AND created_at >= CURRENT_DATE",
-        )
-        .bind(&device_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap_or(0);
-
-        if active_today >= free_limit {
-            return Err(StatusCode::PAYMENT_REQUIRED); // 402
-        }
-    }
 
     sqlx::query_as::<_, Stop>(
         r#"
@@ -173,17 +149,18 @@ pub async fn sync_stops(
     for s in &payload.stops {
         let res = sqlx::query(
             r#"
-            INSERT INTO stops (
-                device_id, client_id, address, lat, lng,
-                priority, note, income, client_name, client_phone,
-                stop_order, created_at
-            )
-            VALUES (
-                $1, $2, $3, $4, $5,
-                COALESCE($6, 'normal'), $7, $8, $9, $10,
-                COALESCE($11, 0), COALESCE($12, NOW())
-            )
-            ON CONFLICT (device_id, client_id) DO NOTHING
+            INSERT INTO stops (id, user_id, address, client_name, phone, notes, lat, lng, status, income, created_at, completed_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'pending'), $10, COALESCE($11, NOW()), $12)
+            ON CONFLICT (user_id, id) DO UPDATE SET
+                address      = EXCLUDED.address,
+                client_name  = EXCLUDED.client_name,
+                phone        = EXCLUDED.phone,
+                lat          = EXCLUDED.lat,
+                lng          = EXCLUDED.lng,
+                status       = EXCLUDED.status,
+                completed_at = EXCLUDED.completed_at,
+                notes        = EXCLUDED.notes,
+                income       = EXCLUDED.income
             "#,
         )
         .bind(&device_id)
@@ -245,3 +222,4 @@ pub async fn sync_stops(
         errors,
     }))
 }
+

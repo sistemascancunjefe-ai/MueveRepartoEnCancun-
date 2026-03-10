@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getDistance } from "./utils";
 import { SpatialHash } from "./SpatialHash";
 
@@ -15,6 +14,24 @@ type RouteData = {
     }[];
 };
 
+interface Catalog {
+    rutas: RouteData[];
+}
+
+interface InitResult {
+    text: string;
+    data: unknown;
+}
+
+function isCatalog(value: unknown): value is Catalog {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        Object.prototype.hasOwnProperty.call(value, 'rutas') &&
+        Array.isArray((value as { rutas?: unknown }).rutas)
+    );
+}
+
 export class CoordinatesStore {
     // 🛡️ SECURITY FIX (Prototype Pollution Prevention)
     // By using a Map instead of a plain Object (Record<string, ...>),
@@ -23,12 +40,12 @@ export class CoordinatesStore {
     // potentially leading to DoS or bypassing logic checks.
     private db: Map<string, [number, number]> | null = null;
     private spatialIndex: SpatialHash<string> | null = null;
-    private loadingPromise: Promise<{ text: string, data: any }> | null = null;
+    private loadingPromise: Promise<InitResult> | null = null;
     private allPoints: Coordinate[] = [];
 
     static instance = new CoordinatesStore();
 
-    async init(initialData?: any): Promise<{ text: string, data: any }> {
+    async init(initialData?: unknown): Promise<InitResult> {
         if (this.loadingPromise && !initialData) return this.loadingPromise;
 
         this.loadingPromise = (async () => {
@@ -62,8 +79,8 @@ export class CoordinatesStore {
                 this.spatialIndex = new SpatialHash<string>(); // Initialize SpatialHash
                 this.allPoints = []; // Clear on re-init to prevent duplicates
                 
-                if (data.rutas) {
-                    data.rutas.forEach((route: RouteData) => {
+                if (isCatalog(data)) {
+                    data.rutas.forEach((route) => {
                         route.paradas.forEach(stop => {
                             // Normalize Key
                             const key = stop.nombre.toLowerCase().trim();

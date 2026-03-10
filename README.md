@@ -4,6 +4,13 @@
 
 **Mueve Reparto** es una PWA offline-first diseñada para repartidores independientes en Cancún y zonas similares. Organiza paradas, traza rutas, notifica clientes por WhatsApp/Telegram y mide tu productividad diaria — todo sin depender de internet.
 
+
+## Capturas de Pantalla
+
+| Home | Rutas | Pedidos | Reparto | Perfil |
+|------|-------|---------|---------|--------|
+| ![Home](docs/screenshots/home.png) | ![Rutas](docs/screenshots/rutas.png) | ![Pedidos](docs/screenshots/pedidos.png) | ![Reparto](docs/screenshots/reparto.png) | ![Perfil](docs/screenshots/perfil.png) |
+
 ---
 
 ## El Problema
@@ -31,11 +38,15 @@ Los repartidores independientes no tienen herramientas. Las apps empresariales (
 ```
 Frontend:    Astro 5 (SSR) + Vanilla JS + Tailwind CSS v3
 Maps:        Leaflet (dark tiles — OpenStreetMap)
-Storage:     IndexedDB (idb 8) — offline-first, sin backend
+Storage:     IndexedDB (idb 8) — offline-first
 PWA:         Service Worker + Web App Manifest (installable)
 Routing:     Nearest-neighbor greedy (JS puro)
 Build:       pnpm + Vite 6
 Deploy:      Render (Node.js Web Service)
+Backend:     Rust + Axum + PostgreSQL (Render)
+Auth:        (WIP) OTP SMS + JWT (pendiente de implementar en backend)
+Geocoding:   Nominatim OSM (con caché IDB)
+Scanning:    jsQR (QR) + Tesseract.js (OCR)
 ```
 
 ---
@@ -60,10 +71,12 @@ src/
 ├── pages/
 │   ├── index.astro       — Splash + redirect /home
 │   ├── home.astro        — Dashboard diario
-│   ├── pedidos.astro     — CRUD de paradas
+│   ├── pedidos.astro     — CRUD de paradas (QR, OCR, geocoding, paywall)
 │   ├── reparto.astro     — Mapa + GPS + optimizador
 │   ├── enviar.astro      — Notificaciones cliente
 │   ├── metricas.astro    — Métricas y ROI
+│   ├── auth.astro        — Login OTP (teléfono → OTP → JWT)
+│   ├── suscripcion.astro — Plan Free/Pro + CTA Conekta
 │   ├── 404.astro
 │   └── offline.astro
 ├── components/
@@ -71,9 +84,19 @@ src/
 │   ├── InteractiveMap.astro
 │   └── ui/               — Componentes base (Button, Card, Toast…)
 ├── layouts/
-│   └── MainLayout.astro  — Layout con header dark + BottomNav
+│   └── MainLayout.astro  — Layout con header dark + badge plan + BottomNav
 └── lib/
-    └── idb.ts            — IndexedDB helper tipado
+    ├── idb.ts            — IndexedDB helper tipado (stores + geocache)
+    └── sync.ts           — Sync IDB → backend (X-Device-Id)
+backend/
+├── src/
+│   ├── main.rs           — Axum app, rutas, AppState
+│   ├── state.rs          — AppState { pool, jwt_secret }
+│   ├── routes/           — stops.rs, stats.rs, auth.rs
+│   └── middleware/       — auth.rs (extractor AuthUser)
+└── migrations/
+    ├── 001_initial.sql   — devices, stops, daily_stats
+    └── 002_auth.sql      — users, otp_attempts, subscriptions
 public/
 ├── manifest.json
 ├── favicon.svg
@@ -106,8 +129,16 @@ cp .env.example .env
 | Variable | Descripción | Requerida |
 |----------|-------------|-----------|
 | `NODE_VERSION` | Versión de Node para Render (`20.10.0`) | Sí |
+| `DATABASE_URL` | PostgreSQL connection string | Backend |
+| `JWT_SECRET` | Secreto para firmar tokens JWT | Backend |
+| `TWILIO_ACCOUNT_SID` | SID de cuenta Twilio (OTP SMS) | Backend prod |
+| `TWILIO_AUTH_TOKEN` | Token de autenticación Twilio | Backend prod |
+| `TWILIO_PHONE_FROM` | Número Twilio origen | Backend prod |
+| `CONEKTA_PRIVATE_KEY` | Llave privada Conekta (P5.2) | Backend prod |
+| `CONEKTA_WEBHOOK_SECRET` | Secreto para HMAC webhooks Conekta | Backend prod |
+| `PUBLIC_API_URL` | URL del backend Rust en Render | Frontend prod |
 
-No hay claves de API requeridas para desarrollo local.
+No hay claves de API requeridas para desarrollo local básico.
 
 ---
 
@@ -125,11 +156,20 @@ TL;DR:
 
 ## Hoja de ruta
 
+Ver [`ROADMAP.md`](ROADMAP.md) y [`docs/ROADMAP.md`](docs/ROADMAP.md) para el roadmap completo.
+
 - [x] **P1** — Rebrand + UI/UX completo (6 páginas delivery)
 - [x] **P2** — Limpieza legacy + documentación
-- [ ] **P3** — Backend Rust/PostgreSQL en Render (sync de paradas)
-- [ ] **P4** — Geocodificación Nominatim OSM (captura por texto)
-- [ ] **P5** — Auth OTP + monetización (plan pro)
+- [x] **P2.5** — Deploy Render (Node.js Web Service)
+- [x] **P3.1** — Geocodificación Nominatim + caché IDB
+- [x] **P3.2** — QR Scanner (jsQR) + OCR (Tesseract.js)
+- [x] **P3.3** — Backend Rust/Axum + PostgreSQL en Render
+- [x] **P4** — Autocompletar de direcciones (dropdown Nominatim)
+- [ ] **P5** — Auth OTP + JWT + Plan Free/Pro (parcial / pendiente: backend `/auth/*` + OTP/Twilio)
+- [ ] **P5.2** — Pagos Conekta (Free → Pro upgrade) 🔴 Pendiente inmediato
+- [ ] **P6** — Modo Empresa (múltiples repartidores) 🟡
+- [ ] **P7** — Integraciones externas (WhatsApp API, CSV import) 🟢
+- [ ] **P8** — Analytics + BI para jefes de reparto 🟢
 
 ---
 

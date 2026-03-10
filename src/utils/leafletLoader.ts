@@ -1,4 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
+type WindowWithLeaflet = Window & { L?: unknown };
 
 let loadPromise: Promise<void> | null = null;
 
@@ -6,7 +7,7 @@ export function loadLeaflet(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve(); // Server-side
 
   // Check if Leaflet is already loaded globally
-  if ((window as any).L) {
+  if ((window as WindowWithLeaflet).L) {
       return Promise.resolve();
   }
 
@@ -37,7 +38,7 @@ export function loadLeaflet(): Promise<void> {
 
     const jsPromise = new Promise<void>((jsResolve, jsReject) => {
       script.onload = () => {
-        if ((window as any).L) {
+        if ((window as WindowWithLeaflet).L) {
           jsResolve();
         } else {
           jsReject(new Error('Leaflet script loaded but window.L is missing'));
