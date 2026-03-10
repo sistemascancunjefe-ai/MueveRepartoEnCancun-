@@ -201,12 +201,15 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
 
     // Per-day counts for this week
-    const completedStops = stops.filter(s => s.status === 'completed' && s.completedAt);
+    const completedStops = stops.filter(
+      (s): s is Stop & { completedAt: number } =>
+        s.status === 'completed' && s.completedAt != null
+    );
     const dayCounts = weekDays.map(day => {
       let count = 0;
       let income = 0;
       for (const s of completedStops) {
-        if (isSameDay(day, s.completedAt!)) {
+        if (isSameDay(day, s.completedAt)) {
           count++;
           income += s.income ?? 0;
         }
