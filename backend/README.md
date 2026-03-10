@@ -14,9 +14,9 @@ Sincroniza y almacena paradas e información en un entorno offline-first, guarda
 ### Prerequisitos
 - Instalar Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 - Instalar PostgreSQL
-- Opcional: Instalar `sqlx-cli` para gestionar migraciones y query caches
+- Opcional: Instalar `sqlx-cli` para gestionar migraciones y regenerar la caché de queries
   ```sh
-  cargo install sqlx-cli
+  cargo install sqlx-cli --no-default-features --features postgres
   ```
 
 ### Entorno (.env)
@@ -38,3 +38,21 @@ ALLOWED_ORIGINS=http://localhost:4321
    ```
 
 El servidor estará en `http://localhost:8080` de manera predeterminada.
+
+### Compilación Offline con SQLx
+
+Este repositorio incluye un directorio `.sqlx/` con la caché de queries generada por `cargo sqlx prepare`.
+Esto permite compilar sin una base de datos activa al establecer la variable de entorno:
+
+```sh
+SQLX_OFFLINE=true cargo build
+```
+
+Si se modifican queries SQL (en `src/routes/`), la caché debe regenerarse con una base de datos activa:
+
+```sh
+# Con DATABASE_URL apuntando a una BD local con las migraciones aplicadas:
+cargo sqlx prepare
+```
+
+Commitea el directorio `.sqlx/` actualizado para que los demás puedan compilar offline.

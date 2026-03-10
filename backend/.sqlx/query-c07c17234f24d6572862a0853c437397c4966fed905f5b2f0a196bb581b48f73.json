@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO stops (id, user_id, address, client_name, phone, notes, lat, lng, status, income, created_at, completed_at)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, 'pending'), $10, COALESCE($11, NOW()), $12)\n            ON CONFLICT (user_id, id) DO UPDATE SET\n                address      = EXCLUDED.address,\n                client_name  = EXCLUDED.client_name,\n                phone        = EXCLUDED.phone,\n                lat          = EXCLUDED.lat,\n                lng          = EXCLUDED.lng,\n                status       = EXCLUDED.status,\n                completed_at = EXCLUDED.completed_at,\n                notes        = EXCLUDED.notes,\n                income       = EXCLUDED.income\n            WHERE stops.user_id = EXCLUDED.user_id\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Float8",
+        "Float8",
+        "Text",
+        "Float8",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c07c17234f24d6572862a0853c437397c4966fed905f5b2f0a196bb581b48f73"
+}
