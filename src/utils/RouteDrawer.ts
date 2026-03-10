@@ -105,7 +105,8 @@ export function drawRoute(
     coordinatesDB: Map<string, [number, number]>
 ): LayerGroup | undefined {
 
-    // Access global L safely
+    // Access global L safely (handle non-browser environments)
+    if (typeof window === 'undefined') return undefined;
     const L = (window as WindowWithLeaflet).L;
     if (!L || !map) return undefined;
 
