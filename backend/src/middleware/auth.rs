@@ -1,11 +1,8 @@
 use axum::{
     extract::{FromRef, FromRequestParts},
     http::{request::Parts, StatusCode},
-    RequestPartsExt,
 };
-use axum_extra::headers::{authorization::Bearer, Authorization};
-use axum_extra::TypedHeader;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -13,13 +10,14 @@ use crate::state::JwtSecret;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: Uuid,
-    pub exp: usize,
+    pub sub: String,   // user UUID
+    pub phone: String,
+    pub plan: String,  // "free" | "pro"
+    pub exp: usize,    // Unix timestamp de expiración
 }
 
-pub struct AuthUser {
-    pub user_id: Uuid,
-}
+/// Extractor para rutas protegidas — devuelve 401 si el token falta o es inválido
+pub struct AuthUser(pub Claims);
 
 /// Extract an authenticated user from the Bearer token.
 ///
@@ -42,15 +40,13 @@ where
 
         let JwtSecret(secret) = JwtSecret::from_ref(state);
         let token_data = decode::<Claims>(
-            bearer.token(),
+            token,
             &DecodingKey::from_secret(secret.as_bytes()),
             &Validation::default(),
         )
         .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-        Ok(AuthUser {
-            user_id: token_data.claims.sub,
-        })
+        Ok(AuthUser(token_data.claims))
     }
 }
 

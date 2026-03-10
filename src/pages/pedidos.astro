@@ -60,6 +60,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div class="mode-tabs" role="group" aria-label="Modo de captura">
     <button class="mode-tab active" data-mode="text"   aria-pressed="true">Texto</button>
     <button class="mode-tab"        data-mode="coords" aria-pressed="false">Coords</button>
+    <button class="mode-tab"        data-mode="ocr"    aria-pressed="false">OCR</button>
     <button class="mode-tab"        data-mode="link"   aria-pressed="false">Link</button>
     <button class="mode-tab"        data-mode="qr"     aria-pressed="false">QR</button>
   </div>
@@ -72,9 +73,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     <div style="position:relative;">
       <textarea id="input-address" class="input" rows="2"
                 placeholder="Av. Tulum #123, SM 5, Cancún..."
-                style="resize:none;border-radius:var(--radius-lg);" aria-describedby="address-warning"></textarea>
+                style="resize:none;border-radius:var(--radius-lg);"></textarea>
       <div id="address-suggestions" class="suggestions-dropdown" style="display:none;" role="listbox"></div>
-      <p id="address-warning" role="status" aria-live="polite" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;"></p>
+      <p id="address-warning" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;">
+        ⚠️ Dirección no encontrada. Se guardará sin mapa.
+      </p>
     </div>
   </div>
 
@@ -91,6 +94,48 @@ import MainLayout from '../layouts/MainLayout.astro';
     <input id="input-address-from-coords" type="hidden" />
   </div>
 
+  <!-- OCR mode -->
+  <div id="mode-ocr" class="mode-panel" style="display:none;">
+    <div style="background:var(--surface-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:1rem;text-align:center;">
+      <p style="font-size:0.875rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem;">Escanear Captura de Pantalla</p>
+
+      <div style="margin-bottom:1rem;">
+        <input type="file" id="ocr-input-file" accept="image/*" style="display:none;" />
+        <button id="btn-ocr-take-photo" class="btn-secondary btn-md" style="margin:0 auto; display:flex; gap:0.5rem; align-items:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
+          Seleccionar o Tomar Foto
+        </button>
+      </div>
+
+      <div id="ocr-preview-container" style="display:none; margin-bottom:1rem;">
+        <img id="ocr-preview-img" src="" alt="Preview" style="max-width:100%; max-height:200px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);" />
+      </div>
+
+      <button id="btn-ocr-extract" class="btn-primary btn-sm" style="margin:0 auto; display:none;">
+        Extraer dirección
+      </button>
+
+      <div id="ocr-progress-container" style="display:none; margin-top:1rem;">
+        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">
+          <span id="ocr-progress-status">Inicializando...</span>
+          <span id="ocr-progress-percentage">0%</span>
+        </div>
+        <div style="width:100%; background:var(--surface-input); height:6px; border-radius:3px; overflow:hidden;">
+          <div id="ocr-progress-bar" style="width:0%; height:100%; background:var(--color-primary); transition:width 0.2s;"></div>
+        </div>
+      </div>
+
+      <div id="ocr-result-container" style="display:none; margin-top:1rem; text-align:left;">
+        <label class="field-label">Texto Extraído</label>
+        <textarea id="ocr-textarea-result" class="input" rows="3" style="resize:vertical; border-radius:var(--radius-md); font-size:0.8125rem; font-family:monospace; margin-bottom:0.5rem;"></textarea>
+        <button id="btn-ocr-use-address" class="btn-secondary btn-sm" style="width:100%;">
+          Usar esta dirección
+        </button>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Link mode -->
   <div id="mode-link" class="mode-panel" style="display:none;">
     <label class="field-label">Link de Google Maps / Waze</label>
@@ -102,14 +147,81 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   <!-- QR mode -->
   <div id="mode-qr" class="mode-panel" style="display:none;">
-    <div style="background:var(--surface-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:2rem;text-align:center;">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-tertiary);margin:0 auto 0.5rem;display:block;">
-        <path d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5zM22 7h-2V4h-3V2h5v5zm0 15v-5h-2v3h-3v2h5zM2 22h5v-2H4v-3H2v5zM2 2v5h2V4h3V2H2z"/>
-      </svg>
-      <p style="font-size:0.875rem;font-weight:600;color:var(--text-secondary);">Escanear QR</p>
-      <p style="font-size:0.75rem;color:var(--text-tertiary);">Próximamente disponible</p>
-    </div>
+
+  <!-- Sub-tabs: QR Camera | OCR Foto -->
+  <div class="scan-tabs" role="group" aria-label="Método de escaneo">
+    <button class="scan-tab active" data-scan="qr"  aria-pressed="true">
+      📷 Escanear QR
+    </button>
+    <button class="scan-tab"        data-scan="ocr" aria-pressed="false">
+      📝 Foto de pedido
+    </button>
   </div>
+
+  <!-- Panel QR: cámara en tiempo real -->
+  <div id="scan-qr-panel">
+    <div id="qr-video-container" style="position:relative;border-radius:var(--radius-lg);overflow:hidden;background:#000;aspect-ratio:4/3;">
+      <video id="qr-video" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+      <canvas id="qr-canvas" style="display:none;"></canvas>
+      <!-- Visor de enfoque -->
+      <div id="qr-viewfinder" style="position:absolute;inset:15%;border:2px solid var(--color-primary);border-radius:8px;box-shadow:0 0 0 1000px rgba(0,0,0,0.4);"></div>
+      <!-- Estado -->
+      <div id="qr-status" style="position:absolute;bottom:0.75rem;left:0;right:0;text-align:center;font-size:0.75rem;font-weight:700;color:white;">
+        Apunta al código QR
+      </div>
+    </div>
+    <button id="btn-start-qr" class="btn-primary btn-md" style="width:100%;margin-top:0.75rem;">
+      Activar cámara QR
+    </button>
+    <button id="btn-stop-qr" class="btn-secondary btn-sm" style="width:100%;margin-top:0.5rem;display:none;">
+      Detener cámara
+    </button>
+  </div>
+
+  <!-- Panel OCR: foto o archivo -->
+  <div id="scan-ocr-panel" style="display:none;">
+    <div id="ocr-preview-container" style="border-radius:var(--radius-lg);overflow:hidden;background:var(--surface-elevated);border:1px dashed var(--border-light);aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;">
+      <div id="ocr-placeholder" style="text-align:center;padding:1rem;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style="color:var(--text-tertiary);margin-bottom:0.5rem;display:block;margin-inline:auto;">
+          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>
+        <p style="font-size:0.8125rem;color:var(--text-tertiary);margin:0;">Toma o selecciona una foto del pedido</p>
+      </div>
+      <img id="ocr-preview-img" style="display:none;width:100%;height:100%;object-fit:contain;" alt="Vista previa" />
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:0.75rem;">
+      <button id="btn-take-photo" class="btn-primary btn-md">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.2A3.2 3.2 0 0 1 8.8 12 3.2 3.2 0 0 1 12 8.8 3.2 3.2 0 0 1 15.2 12 3.2 3.2 0 0 1 12 15.2M12 7a5 5 0 0 0-5 5 5 5 0 0 0 5 5 5 5 0 0 0 5-5 5 5 0 0 0-5-5m-7-1H3V6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2l-2-2H9l-2 2z"/></svg>
+        Tomar foto
+      </button>
+      <label class="btn-secondary btn-md" style="cursor:pointer;display:flex;align-items:center;justify-content:center;gap:0.375rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+        Galería
+        <input id="file-ocr" type="file" accept="image/*" capture="environment" style="display:none;" />
+      </label>
+    </div>
+
+    <div id="ocr-processing" style="display:none;text-align:center;padding:1rem;">
+      <div style="width:24px;height:24px;border:3px solid var(--color-primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 0.5rem;"></div>
+      <p style="font-size:0.8125rem;color:var(--text-secondary);margin:0;">Analizando texto...</p>
+    </div>
+
+  </div>
+
+  <!-- Resultado del escaneo -->
+  <div id="scan-result" style="display:none;margin-top:0.75rem;padding:0.75rem;background:var(--color-primary-light);border:1px solid var(--color-primary);border-radius:var(--radius-lg);">
+    <p style="font-size:0.75rem;font-weight:700;color:var(--text-brand);margin:0 0 0.375rem;">Datos detectados — revisa y edita:</p>
+    <div id="scan-result-content" style="font-size:0.8125rem;color:var(--text-secondary);"></div>
+    <button id="btn-apply-scan" class="btn-primary btn-sm" style="width:100%;margin-top:0.625rem;">
+      Usar estos datos
+    </button>
+    <button id="btn-discard-scan" class="btn-secondary btn-sm" style="width:100%;margin-top:0.375rem;">
+      Descartar
+    </button>
+  </div>
+
+</div>
 
   <!-- Common fields -->
   <div style="margin-top:0.875rem;display:flex;flex-direction:column;gap:0.625rem;">
@@ -157,11 +269,32 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div id="detail-content"></div>
 </div>
 
+<!-- ──────────────── -->
+<!-- Paywall modal   -->
+<!-- ──────────────── -->
+<div id="paywall-overlay" class="bottom-sheet-overlay" aria-hidden="true"></div>
+<div id="paywall-sheet" class="bottom-sheet" role="dialog" aria-label="Límite alcanzado" aria-modal="true">
+  <div class="sheet-handle"></div>
+  <div style="text-align:center;padding:0.5rem 0 1rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.5rem;">🚀</div>
+    <h2 style="font-size:1.25rem;font-weight:900;color:var(--text-primary);margin:0 0 0.5rem;">Límite del plan gratuito</h2>
+    <p style="font-size:0.875rem;color:var(--text-secondary);margin:0 0 1.25rem;line-height:1.5;">
+      Has alcanzado las <strong style="color:var(--color-accent);">20 paradas activas</strong> del plan gratuito.<br/>
+      Actualiza a <strong style="color:var(--color-primary);">Pro</strong> para paradas ilimitadas.
+    </p>
+    <a href="/suscripcion" class="btn-primary btn-lg" style="display:block;width:100%;text-align:center;text-decoration:none;margin-bottom:0.5rem;">
+      Ver plan Pro — $99/mes
+    </a>
+    <button id="paywall-close" class="btn-secondary btn-md" style="width:100%;">
+      Cerrar
+    </button>
+  </div>
+</div>
+
 <script>
-  import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES } from '../lib/idb';
   import { escapeHtml } from '../utils/utils';
+  import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-  import { escapeHtml } from '../utils/utils';
 
 
   let currentFilter = 'all';
@@ -169,6 +302,200 @@ import MainLayout from '../layouts/MainLayout.astro';
   let currentMode = 'text';
   let allStops: Stop[] = [];
   let editingId: string | null = null;
+  // ── QR Scanner ──
+  let qrStream: MediaStream | null = null;
+  let qrAnimFrame: number | null = null;
+  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number } = {};
+
+  // Cargar jsQR desde el bundle (instalado como dependencia npm)
+  async function loadJsQR(): Promise<any> {
+    const mod = await import('jsqr');
+    return mod.default;
+  }
+
+  async function startQRScanner() {
+    const video = document.getElementById('qr-video') as HTMLVideoElement;
+    const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+    const status = document.getElementById('qr-status')!;
+    const btnStart = document.getElementById('btn-start-qr')!;
+    const btnStop = document.getElementById('btn-stop-qr')!;
+
+    try {
+      const jsQR = await loadJsQR();
+
+      qrStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+
+      video.srcObject = qrStream;
+      video.style.display = 'block';
+      btnStart.style.display = 'none';
+      btnStop.style.display = 'block';
+      status.textContent = 'Buscando código QR...';
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+      function scanFrame() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width  = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert',
+          });
+
+          if (code) {
+            status.textContent = '✅ QR detectado!';
+            stopQRScanner();
+            processQRData(code.data);
+            return;
+          }
+        }
+        qrAnimFrame = requestAnimationFrame(scanFrame);
+      }
+
+      qrAnimFrame = requestAnimationFrame(scanFrame);
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        status.textContent = '❌ Permiso de cámara denegado — actívalo en configuración';
+      } else if (err.name === 'NotFoundError') {
+        status.textContent = '❌ No se encontró cámara — usa el modo "Foto de pedido"';
+      } else {
+        status.textContent = '❌ Error al activar cámara';
+      }
+    }
+  }
+
+  function stopQRScanner() {
+    if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
+    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
+    const video = document.getElementById('qr-video') as HTMLVideoElement;
+    if (video) video.srcObject = null;
+    const btnStart = document.getElementById('btn-start-qr')!;
+    const btnStop = document.getElementById('btn-stop-qr')!;
+    if (btnStart) btnStart.style.display = 'block';
+    if (btnStop)  btnStop.style.display  = 'none';
+  }
+
+  function processQRData(raw: string) {
+    // Un QR puede contener: URL de Google Maps, vCard, texto plano, JSON
+    const parsed = parseScannedText(raw);
+    showScanResult(parsed, raw);
+  }
+
+  // ── OCR Scanner ──
+  async function loadTesseract(): Promise<any> {
+    const mod = await import('tesseract.js');
+    return mod.default ?? mod;
+  }
+
+  async function runOCR(imageSource: string | File) {
+    const processing = document.getElementById('ocr-processing')!;
+    processing.style.display = 'block';
+
+    try {
+      const Tesseract = await loadTesseract();
+      const result = await Tesseract.recognize(imageSource, 'spa', {
+        // Configuración para texto impreso, no manuscrito
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZabcdefghijklmnñopqrstuvwxyz0123456789 .,#-:/()áéíóúÁÉÍÓÚ$\n',
+      });
+
+      const rawText = result.data.text;
+      const parsed = parseScannedText(rawText);
+      showScanResult(parsed, rawText);
+    } catch {
+      alert('Error al procesar la imagen. Intenta con otra foto.');
+    } finally {
+      processing.style.display = 'none';
+    }
+  }
+
+  // ── Parser de texto extraído ──
+  function parseScannedText(raw: string): typeof scannedData {
+    const text = raw.trim();
+    const result: typeof scannedData = {};
+
+    // Teléfono mexicano
+    const phoneMatch = text.match(/(?:tel[.:]\s*)?(?:\+?52\s*)?(\d{3}[\s-]?\d{3}[\s-]?\d{4}|\d{10})/i);
+    if (phoneMatch) result.clientPhone = phoneMatch[1].replace(/[\s-]/g, '');
+
+    // Monto
+    const amountMatch = text.match(/(?:pago|cobro|total|monto|precio|costo)[:\s]*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+    if (amountMatch) result.income = parseFloat(amountMatch[1]);
+
+    // Dirección (línea que contiene palabras de vialidad mexicana)
+    const addrMatch = text.match(/(?:av(?:enida)?\.?|calle|blvd|boulevard|carr\.?|carretera|col\.?|colonia|sm\s*\d|supermanzana|mz\s*\d|manzana|lote|lt\s*\d)[\s.]+[^\n]{8,}/i);
+    if (addrMatch) result.address = addrMatch[0].trim();
+
+    // Notas
+    const notesMatch = text.match(/(?:nota[s]?|instrucciones|aviso)[:\s]+([^\n]{5,})/i);
+    if (notesMatch) result.note = notesMatch[1].trim();
+
+    // Nombre (primera línea que parece nombre propio)
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    for (const line of lines) {
+      if (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3}$/.test(line) && line !== result.address) {
+        result.clientName = line;
+        break;
+      }
+    }
+
+    // Si no encontró dirección estructurada, usar la línea más larga que no sea nombre/tel/monto
+    if (!result.address) {
+      const longestLine = lines
+        .filter(l => l.length > 15 && !/^\d{10}$/.test(l) && l !== result.clientName)
+        .sort((a, b) => b.length - a.length)[0];
+      if (longestLine) result.address = longestLine;
+    }
+
+    return result;
+  }
+
+  function showScanResult(parsed: typeof scannedData, rawText: string) {
+    scannedData = parsed;
+    const resultEl = document.getElementById('scan-result')!;
+    const contentEl = document.getElementById('scan-result-content')!;
+
+    const rows = [
+      parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${escapeHtml(parsed.address)}</div>` : '',
+      parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${escapeHtml(parsed.clientName)}</div>` : '',
+      parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${escapeHtml(parsed.clientPhone)}</div>` : '',
+      parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${escapeHtml(String(parsed.income))}</div>` : '',
+      parsed.note       ? `<div>📝 <strong>Nota:</strong> ${escapeHtml(parsed.note)}</div>` : '',
+    ].filter(Boolean);
+
+    if (rows.length === 0) {
+      contentEl.innerHTML = `<p style="color:var(--text-tertiary);">No se detectaron datos reconocibles. Texto crudo:<br/><code style="font-size:0.7rem;">${escapeHtml(rawText.slice(0, 100))}</code></p>`;
+    } else {
+      contentEl.innerHTML = rows.join('');
+    }
+
+    resultEl.style.display = 'block';
+  }
+
+  function applyScanResult() {
+    if (scannedData.address) {
+      (document.getElementById('input-address') as HTMLTextAreaElement).value = scannedData.address;
+    }
+    if (scannedData.clientName) {
+      (document.getElementById('input-client-name') as HTMLInputElement).value = scannedData.clientName;
+    }
+    if (scannedData.clientPhone) {
+      (document.getElementById('input-client-phone') as HTMLInputElement).value = scannedData.clientPhone;
+    }
+    if (scannedData.income) {
+      (document.getElementById('input-income') as HTMLInputElement).value = String(scannedData.income);
+    }
+    if (scannedData.note) {
+      (document.getElementById('input-note') as HTMLInputElement).value = scannedData.note;
+    }
+
+    // Cambiar al modo texto para mostrar los datos extraídos
+    switchMode('text');
+    updateSaveBtn();
+    document.getElementById('scan-result')!.style.display = 'none';
+  }
 
   // -- Address Autocomplete State --
   let currentCoords: { lat: number, lng: number } | null = null;
@@ -176,7 +503,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   let searchToken = 0;
 
   // Returns Nominatim results array, { serviceUnavailable: true } on 429/503, or [] on other errors.
-  async function geocodeAddress(query: string): Promise<any[] | { serviceUnavailable: true }> {
+  async function fetchGeocodeSuggestions(query: string): Promise<any[] | { serviceUnavailable: true }> {
     try {
       // Add Cancun to query if not present to improve local results
       const q = query.toLowerCase().includes('cancun') || query.toLowerCase().includes('cancún')
@@ -279,7 +606,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     clearTimeout(autocompleteTimeout);
     autocompleteTimeout = window.setTimeout(async () => {
       const token = ++searchToken;
-      const results = await geocodeAddress(val);
+      const results = await fetchGeocodeSuggestions(val);
       // Discard stale responses
       if (token !== searchToken) return;
       renderSuggestions(results);
@@ -318,7 +645,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     listEl.innerHTML = filtered.map((s, i) => `
       <div class="stop-card ${s.status === 'completed' ? 'completed' : ''} ${s.priority === 'urgent' ? 'priority-urgent' : 'priority-normal'}"
-           data-id="${s.id}" role="button" tabindex="0" aria-label="Parada ${s.order + 1}: ${escapeHtml(s.address)}">
+           data-id="${s.id}" data-order="${s.order}" draggable="true" role="button" tabindex="0" aria-label="Parada ${s.order + 1}: ${escapeHtml(s.address)}">
 
         <!-- Drag handle -->
         <div class="drag-handle" aria-hidden="true">
@@ -329,13 +656,17 @@ import MainLayout from '../layouts/MainLayout.astro';
 
         <!-- Number -->
         <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}">${s.order + 1}</div>
-
         <!-- Content -->
         <div style="flex:1;min-width:0;">
           <p class="stop-address">${escapeHtml(s.address)}</p>
           ${s.note ? `<p class="stop-meta">${escapeHtml(s.note)}</p>` : ''}
           ${s.clientName ? `<p class="stop-meta">${escapeHtml(s.clientName)}${s.clientPhone ? ' · ' + escapeHtml(s.clientPhone) : ''}</p>` : ''}
+          <span id="geo-${s.id}" class="geo-indicator" style="display:none;align-items:center;gap:0.375rem;font-size:0.6875rem;color:var(--text-tertiary);font-weight:600;">
+            <svg class="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>
+            Buscando coords...
+          </span>
         </div>
+
 
         <!-- Right side -->
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:0.375rem;flex-shrink:0;">
@@ -359,6 +690,84 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // Bind events on stop cards
     listEl.querySelectorAll('.stop-card').forEach(card => {
+      // Drag and Drop
+      card.addEventListener('dragstart', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        const index = target.dataset.index;
+        if (index === null || index === undefined) return;
+        e.dataTransfer.setData('text/plain', index);
+        e.dataTransfer.effectAllowed = 'move';
+        target.classList.add('dragging');
+      });
+
+      card.addEventListener('dragend', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('dragging');
+        // Clear any lingering drag-over states (e.g. cancelled drag)
+        listEl.querySelectorAll('.stop-card.drag-over').forEach((el: Element) => {
+          el.classList.remove('drag-over');
+        });
+      });
+
+      card.addEventListener('dragover', (e: any) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('drag-over');
+      });
+
+      card.addEventListener('dragleave', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+      });
+
+      card.addEventListener('drop', async (e: any) => {
+        e.preventDefault();
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+
+        const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const dropIndex = parseInt(target.getAttribute('data-index')!, 10);
+
+        if (dragIndex === dropIndex || isNaN(dragIndex) || isNaN(dropIndex)) return;
+
+        // Identificamos el id del elemento donde se soltó ANTES de reordenar
+        const targetId = filtered[dropIndex].id;
+
+        // Reorder logic en filtered
+        // When dragging downward the splice shifts indices, so adjust insertion point
+        const item = filtered.splice(dragIndex, 1)[0];
+        const insertAt = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        filtered.splice(insertAt, 0, item);
+
+        // Update orders to match new positions
+        if (currentFilter === 'all') {
+          const promises = filtered.map((stop, idx) => {
+            stop.order = idx;
+            return dbPut(STORES.STOPS, stop);
+          });
+          await Promise.all(promises);
+        } else {
+          // Si estamos filtrando, buscar su índice en allStops
+          const allStopsItemIndex = allStops.findIndex(s => s.id === item.id);
+          const allStopsTargetIndex = allStops.findIndex(s => s.id === targetId);
+
+          if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
+            const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
+            // Adjust for direction shift, mirroring the filtered reorder adjustment
+            const allInsertAt = allStopsItemIndex < allStopsTargetIndex ? allStopsTargetIndex - 1 : allStopsTargetIndex;
+            allStops.splice(allInsertAt, 0, removedItem);
+
+            const promises = allStops.map((stop, idx) => {
+              stop.order = idx;
+              return dbPut(STORES.STOPS, stop);
+            });
+            await Promise.all(promises);
+          }
+        }
+
+        await renderStops();
+      });
       card.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.closest('.stop-action-btn')) return;
@@ -386,6 +795,61 @@ import MainLayout from '../layouts/MainLayout.astro';
         }
       });
     });
+
+    // ── Drag-and-drop reordering ──
+    let dragSrcId: string | null = null;
+
+    listEl.querySelectorAll<HTMLElement>('.stop-card').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        dragSrcId = card.dataset.id!;
+        card.classList.add('dragging');
+        e.dataTransfer!.effectAllowed = 'move';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        listEl.querySelectorAll('.stop-card').forEach(c => c.classList.remove('drag-over'));
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
+        listEl.querySelectorAll('.stop-card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('drag-over');
+      });
+
+      card.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropId = card.dataset.id!;
+        if (!dragSrcId || dragSrcId === dropId) return;
+
+        // Reordenar: intercambiar los valores de `order`
+        const allCurrent = await getStops();
+        const src  = allCurrent.find(s => s.id === dragSrcId);
+        const dest = allCurrent.find(s => s.id === dropId);
+        if (!src || !dest) return;
+
+        const srcOrder  = src.order;
+        const destOrder = dest.order;
+
+        // Shift stops entre src y dest
+        const updated: import('../lib/idb').Stop[] = allCurrent.map(s => {
+          if (s.id === dragSrcId) return { ...s, order: destOrder };
+          if (srcOrder < destOrder && s.order > srcOrder && s.order <= destOrder) return { ...s, order: s.order - 1 };
+          if (srcOrder > destOrder && s.order >= destOrder && s.order < srcOrder) return { ...s, order: s.order + 1 };
+          return s;
+        });
+
+        await Promise.all(updated.map(s => dbPut(STORES.STOPS, s)));
+        dragSrcId = null;
+        await renderStops();
+      });
+    });
   }
 
   function filterStops(stops: Stop[], filter: string): Stop[] {
@@ -397,8 +861,33 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
   }
 
+  const FREE_LIMIT = parseInt(import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20', 10);
+
+  function isPro(): boolean {
+    return localStorage.getItem('mr-plan') === 'pro';
+  }
+
+  function openPaywall() {
+    const overlay = document.getElementById('paywall-overlay')!;
+    const sheet   = document.getElementById('paywall-sheet')!;
+    overlay.classList.add('open');
+    sheet.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+
+  function closePaywall() {
+    document.getElementById('paywall-overlay')!.classList.remove('open');
+    document.getElementById('paywall-sheet')!.classList.remove('open');
+    document.getElementById('paywall-overlay')!.setAttribute('aria-hidden', 'true');
+  }
+
   // ── Add Sheet ──
   function openAddSheet() {
+    const activeStops = allStops.filter(s => s.status !== 'completed').length;
+    if (!isPro() && activeStops >= FREE_LIMIT) {
+      openPaywall();
+      return;
+    }
     editingId = null;
     clearForm();
     const overlay = document.getElementById('add-overlay')!;
@@ -410,6 +899,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   function closeAddSheet() {
+    stopQRScanner();
     document.getElementById('add-overlay')!.classList.remove('open');
     document.getElementById('add-sheet')!.classList.remove('open');
     document.getElementById('add-overlay')!.setAttribute('aria-hidden', 'true');
@@ -426,6 +916,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     (document.getElementById('input-client-phone') as HTMLInputElement).value = '';
     selectedPriority = 'normal';
     currentCoords = null;
+    linkCoords = null;
     const suggestions = document.getElementById('address-suggestions');
     if (suggestions) suggestions.style.display = 'none';
     const warning = document.getElementById('address-warning');
@@ -433,6 +924,34 @@ import MainLayout from '../layouts/MainLayout.astro';
     updatePriorityBtns();
     updateSaveBtn();
   }
+
+  // Extrae { lat, lng } de URLs de Google Maps, Waze, Apple Maps, etc.
+  function parseCoordsFromMapUrl(url: string): { lat: number; lng: number } | null {
+    const patterns = [
+      // Google Maps: /maps/@LAT,LNG o /@LAT,LNG,zoom o ?q=LAT,LNG o &ll=LAT,LNG
+      /[/@?&](-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Waze: ?ll=LAT,LNG o &ll=LAT,LNG
+      /[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Apple Maps: ?ll=LAT,LNG
+      /\?ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Genérico: lat=LAT&lng=LNG o lat=LAT&lon=LNG
+      /lat=(-?\d+\.?\d*)&lon[g]?=(-?\d+\.?\d*)/i,
+    ];
+    for (const re of patterns) {
+      const m = url.match(re);
+      if (m) {
+        const lat = parseFloat(m[1]);
+        const lng = parseFloat(m[2]);
+        // Validar rangos
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+        }
+      }
+    }
+    return null;
+  }
+
+  let linkCoords: { lat: number; lng: number } | null = null;
 
   function getAddressValue(): string {
     switch (currentMode) {
@@ -443,6 +962,7 @@ import MainLayout from '../layouts/MainLayout.astro';
         return lat && lng ? `${lat}, ${lng}` : '';
       }
       case 'link': return (document.getElementById('input-link') as HTMLInputElement).value.trim();
+      case 'qr': return scannedData.address || '';
       default: return '';
     }
   }
@@ -451,6 +971,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     const btn = document.getElementById('btn-save-stop') as HTMLButtonElement;
     const addr = getAddressValue();
     if (btn) btn.disabled = !addr;
+  }
+
+
+  function showGeocodingIndicator(id: string, show: boolean) {
+    const el = document.getElementById(`geo-${id}`);
+    if (el) el.style.display = show ? 'flex' : 'none';
   }
 
   // ── Save stop ──
@@ -464,7 +990,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (currentMode === 'text' && currentCoords) {
       finalLat = currentCoords.lat;
       finalLng = currentCoords.lng;
-    } else if (currentMode === 'coords') {
+    } else {
       const latStr = (document.getElementById('input-lat') as HTMLInputElement).value;
       const lngStr = (document.getElementById('input-lng') as HTMLInputElement).value;
       if (latStr) finalLat = parseFloat(latStr);
@@ -486,10 +1012,23 @@ import MainLayout from '../layouts/MainLayout.astro';
       createdAt:   Date.now(),
     };
 
+
     await dbPut(STORES.STOPS, stop);
     closeAddSheet();
     await renderStops();
+
+    // Geocodificar en segundo plano SOLO en modo texto y si no tiene coords
+    if (currentMode === 'text' && !stop.lat && !stop.lng) {
+      showGeocodingIndicator(stop.id, true);
+      const coords = await geocodeAddress(address);
+      if (coords) {
+        await dbPut(STORES.STOPS, { ...stop, lat: coords.lat, lng: coords.lng });
+        await renderStops();  // Re-render con coords
+      }
+      showGeocodingIndicator(stop.id, false);
+    }
   }
+
 
   // ── Detail Sheet ──
   function openDetail(id: string) {
@@ -579,28 +1118,116 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── Mode tabs ──
   function switchMode(mode: string) {
+
+    if (currentMode === 'ocr' && mode !== 'ocr') {
+      cleanupOcr();
+    }
     currentMode = mode;
     document.querySelectorAll('.mode-tab').forEach(t => {
       t.classList.toggle('active', (t as HTMLElement).dataset.mode === mode);
       (t as HTMLButtonElement).setAttribute('aria-pressed', String((t as HTMLElement).dataset.mode === mode));
     });
-    ['text','coords','link','qr'].forEach(m => {
+    ['text','coords','ocr','link','qr'].forEach(m => {
       const panel = document.getElementById(`mode-${m}`)!;
       panel.style.display = m === mode ? 'block' : 'none';
     });
     updateSaveBtn();
   }
 
+
+  async function geocodePendingStops() {
+    if (!navigator.onLine) return;
+    const stops = await getStops();
+    const pending = stops.filter(s => !s.lat && !s.lng && s.status !== 'completed');
+    for (const stop of pending) {
+      const coords = await geocodeAddress(stop.address);
+      if (coords) {
+        await dbPut(STORES.STOPS, { ...stop, lat: coords.lat, lng: coords.lng });
+      }
+    }
+    if (pending.length > 0) {
+      await renderStops();
+    }
+  }
+
   // ── Init ──
   function init() {
+    // QR Scanner events
+    document.getElementById('btn-start-qr')?.addEventListener('click', startQRScanner);
+    document.getElementById('btn-stop-qr')?.addEventListener('click', stopQRScanner);
+    document.getElementById('btn-apply-scan')?.addEventListener('click', applyScanResult);
+    document.getElementById('btn-discard-scan')?.addEventListener('click', () => {
+      document.getElementById('scan-result')!.style.display = 'none';
+      scannedData = {};
+    });
+
+    // Sub-tabs QR vs OCR
+    document.querySelectorAll('.scan-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const mode = (tab as HTMLElement).dataset.scan!;
+        document.querySelectorAll('.scan-tab').forEach(t => {
+          t.classList.toggle('active', t === tab);
+          (t as HTMLButtonElement).setAttribute('aria-pressed', String(t === tab));
+        });
+        const qrPanel  = document.getElementById('scan-qr-panel')!;
+        const ocrPanel = document.getElementById('scan-ocr-panel')!;
+        qrPanel.style.display  = mode === 'qr'  ? 'block' : 'none';
+        ocrPanel.style.display = mode === 'ocr' ? 'block' : 'none';
+        if (mode === 'ocr') stopQRScanner();  // Detener cámara QR si se cambia a OCR
+      });
+    });
+
+    // OCR: tomar foto
+    document.getElementById('btn-take-photo')?.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        // Capturar frame
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        await video.play();
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d')!.drawImage(video, 0, 0);
+        stream.getTracks().forEach(t => t.stop());
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+        // Mostrar preview
+        const img = document.getElementById('ocr-preview-img') as HTMLImageElement;
+        const placeholder = document.getElementById('ocr-placeholder')!;
+        img.src = dataUrl;
+        img.style.display = 'block';
+        placeholder.style.display = 'none';
+
+        await runOCR(dataUrl);
+      } catch {
+        alert('No se pudo acceder a la cámara.');
+      }
+    });
+
+    // OCR: subir archivo de galería
+    document.getElementById('file-ocr')?.addEventListener('change', async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const img = document.getElementById('ocr-preview-img') as HTMLImageElement;
+      const placeholder = document.getElementById('ocr-placeholder')!;
+      img.src = URL.createObjectURL(file);
+      img.style.display = 'block';
+      placeholder.style.display = 'none';
+
+      await runOCR(file);
+    });
+
     document.getElementById('btn-add-stop')?.addEventListener('click', openAddSheet);
     document.getElementById('btn-add-first')?.addEventListener('click', openAddSheet);
     document.getElementById('close-sheet')?.addEventListener('click', closeAddSheet);
     document.getElementById('add-overlay')?.addEventListener('click', closeAddSheet);
     document.getElementById('detail-overlay')?.addEventListener('click', closeDetail);
+    document.getElementById('paywall-close')?.addEventListener('click', closePaywall);
+    document.getElementById('paywall-overlay')?.addEventListener('click', closePaywall);
 
     document.getElementById('btn-save-stop')?.addEventListener('click', saveStop);
-
     // Filter tabs
     document.querySelectorAll('.filter-tab').forEach(tab => {
       tab.addEventListener('click', async () => {
@@ -654,7 +1281,124 @@ import MainLayout from '../layouts/MainLayout.astro';
       });
     });
 
+
+    // OCR tab events
+    const ocrInputFile = document.getElementById('ocr-input-file') as HTMLInputElement;
+    const btnTakePhoto = document.getElementById('btn-ocr-take-photo');
+    const previewContainer = document.getElementById('ocr-preview-container');
+    const previewImg = document.getElementById('ocr-preview-img') as HTMLImageElement;
+    const btnExtract = document.getElementById('btn-ocr-extract');
+    const progressContainer = document.getElementById('ocr-progress-container');
+    const resultContainer = document.getElementById('ocr-result-container');
+
+    if (btnTakePhoto) {
+      btnTakePhoto.addEventListener('click', () => {
+        ocrInputFile?.click();
+      });
+    }
+
+    if (ocrInputFile) {
+      ocrInputFile.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          // Revoke any previously tracked blob URL before creating a new one
+          if (currentPreviewUrl) {
+            URL.revokeObjectURL(currentPreviewUrl);
+          }
+          const url = URL.createObjectURL(file);
+          currentPreviewUrl = url;
+          if (previewImg) {
+            previewImg.src = url;
+            previewImg.onload = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+            previewImg.onerror = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+          }
+          if (previewContainer) previewContainer.style.display = 'block';
+          if (btnExtract) btnExtract.style.display = 'block';
+          if (progressContainer) progressContainer.style.display = 'none';
+          if (resultContainer) resultContainer.style.display = 'none';
+        }
+      });
+    }
+
+    if (btnExtract) {
+      btnExtract.addEventListener('click', () => {
+        extractOcrText();
+      });
+    }
+
+    const btnUseAddress = document.getElementById('btn-ocr-use-address');
+    if (btnUseAddress) {
+      btnUseAddress.addEventListener('click', () => {
+        const text = (document.getElementById('ocr-textarea-result') as HTMLTextAreaElement).value;
+        if (!text) return;
+
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        // Extract phone number (e.g., 10 digits)
+        const phoneRegex = /(?:\+?52)?(?:\s*-)?(?:\d[\s-]?){10}/;
+        const phoneMatch = text.match(phoneRegex);
+        if (phoneMatch) {
+            const inputPhone = document.getElementById('input-client-phone') as HTMLInputElement;
+            if (inputPhone) inputPhone.value = phoneMatch[0].replace(/[\s-]/g, '').slice(-10);
+        }
+
+        // Try to identify Name and Address heuristically
+        // E.g., if line 1 has no numbers it might be the name.
+        // If line 2 has numbers and street names (Calle, Av, SM, Mz, Lt), it's the address.
+        let potentialAddress = "";
+        let potentialName = "";
+        let notes = "";
+
+        for (const line of lines) {
+           const lower = line.toLowerCase();
+           if (lower.includes('calle') || lower.includes('av') || lower.includes('sm') || lower.includes('mz') || lower.includes('lt') || lower.includes('mza') || lower.includes('lote') || lower.includes('c.')) {
+              if (potentialAddress.length > 0) potentialAddress += " " + line;
+              else potentialAddress = line;
+           } else if (line.length > 2 && line.length < 40 && !phoneRegex.test(line) && potentialName === "") {
+              // Could be name if no address keywords and no phone number
+              potentialName = line;
+           } else {
+              if (!line.match(phoneRegex)) {
+                  notes += line + " ";
+              }
+           }
+        }
+
+        if (!potentialAddress) {
+            // If heuristics fail, just use the first non-phone line as address
+            potentialAddress = lines.find(l => !l.match(phoneRegex) && l !== potentialName) || text;
+        }
+
+        const inputAddress = document.getElementById('input-address') as HTMLTextAreaElement;
+        if (inputAddress) {
+            inputAddress.value = potentialAddress.trim();
+            // Trigger input event for validation
+            inputAddress.dispatchEvent(new Event('input'));
+        }
+
+        const inputName = document.getElementById('input-client-name') as HTMLInputElement;
+        if (inputName && potentialName) {
+            inputName.value = potentialName.trim();
+        }
+
+        const inputNote = document.getElementById('input-note') as HTMLInputElement;
+        if (inputNote && notes.trim().length > 0) {
+            inputNote.value = notes.trim().substring(0, 100);
+        }
+
+        switchMode('text');
+      });
+    }
+
+
     renderStops();
+    setTimeout(() => geocodePendingStops(), 2000);
   }
 
   document.addEventListener('astro:page-load', init);
@@ -662,6 +1406,38 @@ import MainLayout from '../layouts/MainLayout.astro';
 </script>
 
 <style>
+  /* Scan sub-tabs */
+  .scan-tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.75rem;
+    background: var(--surface-input);
+    border-radius: var(--radius-lg);
+    padding: 0.25rem;
+  }
+
+  .scan-tab {
+    flex: 1;
+    padding: 0.375rem 0.5rem;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .scan-tab.active {
+    background: var(--surface-card);
+    color: var(--text-primary);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
   .pedidos-page { max-width: 480px; margin: 0 auto; }
 
   .pedidos-header {
@@ -747,6 +1523,17 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   .stop-card:active { transform: scale(0.99); }
+
+  .stop-card.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+  }
+
+  .stop-card.drag-over {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(0, 232, 162, 0.25);
+    transform: scale(1.01);
+  }
 
   .stop-card.completed {
     opacity: 0.5;

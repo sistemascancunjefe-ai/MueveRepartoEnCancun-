@@ -1,4 +1,10 @@
 use axum::{extract::State, http::StatusCode, Json};
+use chrono::Utc;
+use hex;
+use jsonwebtoken::{encode, EncodingKey, Header};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 
 use crate::models::{AuthResponse, OtpRequest, OtpVerify};
@@ -35,6 +41,7 @@ pub async fn request_otp(
     Ok(StatusCode::OK)
 }
 
+/// POST /auth/verify-otp
 pub async fn verify_otp(
     State(state): State<AppState>,
     Json(payload): Json<OtpVerify>,
@@ -73,6 +80,12 @@ pub async fn verify_otp(
     let token = create_token(user_id, &state.jwt_secret)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    Ok(Json(AuthResponse { token }))
+/// GET /auth/me — requiere JWT
+pub async fn me(AuthUser(claims): AuthUser) -> Json<MeResponse> {
+    Json(MeResponse {
+        user_id: claims.sub,
+        phone: claims.phone,
+        plan: claims.plan,
+    })
 }
 
