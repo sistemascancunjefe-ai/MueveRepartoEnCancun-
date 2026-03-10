@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
+// ── Stops ──────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Stop {
     pub id: Uuid,
@@ -48,6 +50,8 @@ pub struct UpdateStop {
     pub income: Option<f64>,
 }
 
+// ── Stats ──────────────────────────────────────────────────────────────────
+
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct DailyStats {
     pub id: Uuid,
@@ -81,4 +85,29 @@ pub struct SyncResponse {
     pub synced_stops: usize,
     pub synced_stats: usize,
     pub errors: Vec<String>,
+}
+
+// ── Auth — Magic Link ──────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct MagicLinkRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MagicLinkSent {
+    pub message: String, // "ok"
+}
+
+#[derive(Debug, Deserialize)]
+pub struct VerifyQuery {
+    pub token: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuthResponse {
+    pub token: String,
+    pub plan: String,
+    pub user_id: String,
+    pub email: String,
 }

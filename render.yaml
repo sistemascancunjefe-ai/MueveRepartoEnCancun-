@@ -17,6 +17,10 @@ services:
           name: mueve-reparto-api
           type: web
           property: url
+      - key: PUBLIC_PLAN_FREE_LIMIT
+        value: "20"
+      - key: PUBLIC_PRO_PRICE_MXN
+        value: "99"
     autoDeploy: true
 
   - type: web
@@ -38,6 +42,14 @@ services:
         value: info
       - key: ALLOWED_ORIGINS
         value: https://mueverepartoencancun.onrender.com
+      - key: FRONTEND_URL
+        value: https://mueverepartoencancun.onrender.com
+      - key: JWT_SECRET
+        generateValue: true
+      # Resend.com — gratis 3,000 emails/mes
+      # Crear en: https://resend.com/api-keys
+      - key: RESEND_API_KEY
+        sync: false
     autoDeploy: true
 
 databases:

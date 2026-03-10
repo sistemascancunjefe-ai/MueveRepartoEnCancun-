@@ -1,0 +1,126 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Verificando acceso..." hideNav={true}>
+  <div class="verify-page">
+    <div class="verify-card" id="state-loading">
+      <div class="spinner"></div>
+      <p>Verificando tu enlace...</p>
+    </div>
+
+    <div class="verify-card" id="state-error" style="display:none;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--color-accent)" aria-hidden="true">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+      </svg>
+      <h2>Enlace inválido o expirado</h2>
+      <p>El enlace ya fue usado o expiró (15 min). Solicita uno nuevo.</p>
+      <a href="/auth" class="btn-primary btn-lg" style="text-decoration:none;display:inline-block;margin-top:1rem;">
+        Solicitar nuevo enlace
+      </a>
+    </div>
+
+    <div class="verify-card" id="state-success" style="display:none;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--color-primary)" aria-hidden="true">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+      </svg>
+      <h2>¡Entraste!</h2>
+      <p>Redirigiendo...</p>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  import { saveSession } from '../../lib/session';
+
+  const API_URL = import.meta.env.PUBLIC_API_URL ?? '';
+
+  async function verify() {
+    const token = new URLSearchParams(window.location.search).get('token');
+
+    if (!token) {
+      showState('error');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/auth/verify?token=${encodeURIComponent(token)}`);
+
+      if (!res.ok) {
+        showState('error');
+        return;
+      }
+
+      const data = await res.json();
+      saveSession({
+        token:  data.token,
+        plan:   data.plan ?? 'free',
+        userId: data.user_id ?? '',
+        email:  data.email ?? '',
+      });
+
+      showState('success');
+      const next = new URLSearchParams(window.location.search).get('next') ?? '/home';
+      setTimeout(() => { window.location.href = next; }, 800);
+    } catch {
+      showState('error');
+    }
+  }
+
+  function showState(state: 'loading' | 'error' | 'success') {
+    ['loading', 'error', 'success'].forEach(s => {
+      const el = document.getElementById(`state-${s}`)!;
+      el.style.display = s === state ? 'flex' : 'none';
+    });
+  }
+
+  verify();
+</script>
+
+<style>
+  .verify-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+  }
+
+  .verify-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    max-width: 340px;
+    text-align: center;
+    background: var(--surface-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    padding: 2.5rem 2rem;
+  }
+
+  .verify-card h2 {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .verify-card p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border-light);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
