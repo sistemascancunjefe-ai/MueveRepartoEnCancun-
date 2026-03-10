@@ -64,12 +64,20 @@ import MainLayout from '../layouts/MainLayout.astro';
     <button class="mode-tab"        data-mode="qr"     aria-pressed="false">QR</button>
   </div>
 
+
+
   <!-- Text mode -->
   <div id="mode-text" class="mode-panel active">
     <label class="field-label">Dirección *</label>
-    <textarea id="input-address" class="input" rows="2"
-              placeholder="Av. Tulum #123, SM 5, Cancún..."
-              style="resize:none;border-radius:var(--radius-lg);"></textarea>
+    <div style="position:relative;">
+      <textarea id="input-address" class="input" rows="2"
+                placeholder="Av. Tulum #123, SM 5, Cancún..."
+                style="resize:none;border-radius:var(--radius-lg);"></textarea>
+      <div id="address-suggestions" class="suggestions-dropdown" style="display:none;" role="listbox"></div>
+      <p id="address-warning" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;">
+        ⚠️ Dirección no encontrada. Se guardará sin mapa.
+      </p>
+    </div>
   </div>
 
   <!-- Coords mode -->
@@ -263,213 +271,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 <script>
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-
-  // ── QR Scanner ──
-  let qrStream: MediaStream | null = null;
-  let qrAnimFrame: number | null = null;
-  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number } = {};
-
-  // Cargar jsQR desde CDN solo cuando se activa el modo QR
-  async function loadJsQR(): Promise<any> {
-    if ((window as any).jsQR) return (window as any).jsQR;
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-      s.onload = () => resolve((window as any).jsQR);
-      s.onerror = () => reject(new Error('No se pudo cargar jsQR'));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function startQRScanner() {
-    const video = document.getElementById('qr-video') as HTMLVideoElement;
-    const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
-    const status = document.getElementById('qr-status')!;
-    const btnStart = document.getElementById('btn-start-qr')!;
-    const btnStop = document.getElementById('btn-stop-qr')!;
-
-    try {
-      const jsQR = await loadJsQR();
-
-      qrStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-
-      video.srcObject = qrStream;
-      video.style.display = 'block';
-      btnStart.style.display = 'none';
-      btnStop.style.display = 'block';
-      status.textContent = 'Buscando código QR...';
-
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-
-      function scanFrame() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width  = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: 'dontInvert',
-          });
-
-          if (code) {
-            status.textContent = '✅ QR detectado!';
-            stopQRScanner();
-            processQRData(code.data);
-            return;
-          }
-        }
-        qrAnimFrame = requestAnimationFrame(scanFrame);
-      }
-
-      qrAnimFrame = requestAnimationFrame(scanFrame);
-    } catch (err: any) {
-      if (err.name === 'NotAllowedError') {
-        status.textContent = '❌ Permiso de cámara denegado — actívalo en configuración';
-      } else if (err.name === 'NotFoundError') {
-        status.textContent = '❌ No se encontró cámara — usa el modo "Foto de pedido"';
-      } else {
-        status.textContent = '❌ Error al activar cámara';
-      }
-    }
-  }
-
-  function stopQRScanner() {
-    if (qrAnimFrame) { cancelAnimationFrame(qrAnimFrame); qrAnimFrame = null; }
-    if (qrStream) { qrStream.getTracks().forEach(t => t.stop()); qrStream = null; }
-    const video = document.getElementById('qr-video') as HTMLVideoElement;
-    if (video) video.srcObject = null;
-    const btnStart = document.getElementById('btn-start-qr')!;
-    const btnStop = document.getElementById('btn-stop-qr')!;
-    if (btnStart) btnStart.style.display = 'block';
-    if (btnStop)  btnStop.style.display  = 'none';
-  }
-
-  function processQRData(raw: string) {
-    // Un QR puede contener: URL de Google Maps, vCard, texto plano, JSON
-    const parsed = parseScannedText(raw);
-    showScanResult(parsed, raw);
-  }
-
-  // ── OCR Scanner ──
-  async function loadTesseract(): Promise<any> {
-    if ((window as any).Tesseract) return (window as any).Tesseract;
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      s.onload = () => resolve((window as any).Tesseract);
-      s.onerror = () => reject(new Error('No se pudo cargar Tesseract'));
-      document.head.appendChild(s);
-    });
-  }
-
-  async function runOCR(imageSource: string | File) {
-    const processing = document.getElementById('ocr-processing')!;
-    processing.style.display = 'block';
-
-    try {
-      const Tesseract = await loadTesseract();
-      const result = await Tesseract.recognize(imageSource, 'spa', {
-        // Configuración para texto impreso, no manuscrito
-        tessedit_char_whitelist: 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZabcdefghijklmnñopqrstuvwxyz0123456789 .,#-:/()áéíóúÁÉÍÓÚ$\n',
-      });
-
-      const rawText = result.data.text;
-      const parsed = parseScannedText(rawText);
-      showScanResult(parsed, rawText);
-    } catch {
-      alert('Error al procesar la imagen. Intenta con otra foto.');
-    } finally {
-      processing.style.display = 'none';
-    }
-  }
-
-  // ── Parser de texto extraído ──
-  function parseScannedText(raw: string): typeof scannedData {
-    const text = raw.trim();
-    const result: typeof scannedData = {};
-
-    // Teléfono mexicano
-    const phoneMatch = text.match(/(?:tel[.:]\s*)?(?:\+?52\s*)?(\d{3}[\s\-]?\d{3}[\s\-]?\d{4}|\d{10})/i);
-    if (phoneMatch) result.clientPhone = phoneMatch[1].replace(/[\s\-]/g, '');
-
-    // Monto
-    const amountMatch = text.match(/(?:pago|cobro|total|monto|precio|costo)[:\s]*\?\s*(\d+(?:\.\d{1,2})?)/i);
-    if (amountMatch) result.income = parseFloat(amountMatch[1]);
-
-    // Dirección (línea que contiene palabras de vialidad mexicana)
-    const addrMatch = text.match(/(?:av(?:enida)?\.?|calle|blvd|boulevard|carr\.?|carretera|col\.?|colonia|sm\s*\d|supermanzana|mz\s*\d|manzana|lote|lt\s*\d)[\s.]+[^\n]{8,}/i);
-    if (addrMatch) result.address = addrMatch[0].trim();
-
-    // Notas
-    const notesMatch = text.match(/(?:nota[s]?|instrucciones|aviso)[:\s]+([^\n]{5,})/i);
-    if (notesMatch) result.note = notesMatch[1].trim();
-
-    // Nombre (primera línea que parece nombre propio)
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    for (const line of lines) {
-      if (/^[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,3}$/.test(line) && line !== result.address) {
-        result.clientName = line;
-        break;
-      }
-    }
-
-    // Si no encontró dirección estructurada, usar la línea más larga que no sea nombre/tel/monto
-    if (!result.address) {
-      const longestLine = lines
-        .filter(l => l.length > 15 && !/^\d{10}$/.test(l) && l !== result.clientName)
-        .sort((a, b) => b.length - a.length)[0];
-      if (longestLine) result.address = longestLine;
-    }
-
-    return result;
-  }
-
-  function showScanResult(parsed: typeof scannedData, rawText: string) {
-    scannedData = parsed;
-    const resultEl = document.getElementById('scan-result')!;
-    const contentEl = document.getElementById('scan-result-content')!;
-
-    const rows = [
-      parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${parsed.address}</div>` : '',
-      parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${parsed.clientName}</div>` : '',
-      parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${parsed.clientPhone}</div>` : '',
-      parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${parsed.income}</div>` : '',
-      parsed.note       ? `<div>📝 <strong>Nota:</strong> ${parsed.note}</div>` : '',
-    ].filter(Boolean);
-
-    if (rows.length === 0) {
-      contentEl.innerHTML = `<p style="color:var(--text-tertiary);">No se detectaron datos reconocibles. Texto crudo:<br/><code style="font-size:0.7rem;">${rawText.slice(0, 100)}</code></p>`;
-    } else {
-      contentEl.innerHTML = rows.join('');
-    }
-
-    resultEl.style.display = 'block';
-  }
-
-  function applyScanResult() {
-    if (scannedData.address) {
-      (document.getElementById('input-address') as HTMLTextAreaElement).value = scannedData.address;
-    }
-    if (scannedData.clientName) {
-      (document.getElementById('input-client-name') as HTMLInputElement).value = scannedData.clientName;
-    }
-    if (scannedData.clientPhone) {
-      (document.getElementById('input-client-phone') as HTMLInputElement).value = scannedData.clientPhone;
-    }
-    if (scannedData.income) {
-      (document.getElementById('input-income') as HTMLInputElement).value = String(scannedData.income);
-    }
-    if (scannedData.note) {
-      (document.getElementById('input-note') as HTMLInputElement).value = scannedData.note;
-    }
-
-    // Cambiar al modo texto para mostrar los datos extraídos
-    switchMode('text');
-    updateSaveBtn();
-    document.getElementById('scan-result')!.style.display = 'none';
-  }
 
 
   let currentFilter = 'all';
@@ -684,6 +485,106 @@ import MainLayout from '../layouts/MainLayout.astro';
     document.getElementById('scan-result')!.style.display = 'none';
   }
 
+  // -- Address Autocomplete State --
+  let currentCoords: { lat: number, lng: number } | null = null;
+  let autocompleteTimeout: number | undefined;
+
+  async function geocodeAddress(query: string) {
+    try {
+      // Add Cancun to query if not present to improve local results
+      const q = query.toLowerCase().includes('cancun') || query.toLowerCase().includes('cancún')
+        ? query
+        : `${query}, Cancún`;
+
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
+      const res = await fetch(url, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      if (!res.ok) throw new Error('Network response was not ok');
+      return await res.json();
+    } catch (err) {
+      console.error('Geocoding error:', err);
+      return [];
+    }
+  }
+
+  function renderSuggestions(results: any[]) {
+    const container = document.getElementById('address-suggestions');
+    const warning = document.getElementById('address-warning');
+    if (!container || !warning) return;
+
+    container.innerHTML = '';
+
+    if (results.length === 0) {
+      container.style.display = 'none';
+      warning.style.display = 'block';
+      return;
+    }
+
+    warning.style.display = 'none';
+
+    results.forEach(res => {
+      const div = document.createElement('div');
+      div.className = 'suggestion-item';
+      div.setAttribute('role', 'option');
+      div.tabIndex = 0;
+
+      const primary = document.createElement('div');
+      primary.className = 'suggestion-primary';
+      const name = res.address?.road ? `${res.address.road}${res.address.house_number ? ' ' + res.address.house_number : ''}` : res.name;
+      primary.textContent = name || res.display_name.split(',')[0];
+
+      const secondary = document.createElement('div');
+      secondary.className = 'suggestion-secondary';
+      secondary.textContent = res.display_name;
+
+      div.appendChild(primary);
+      div.appendChild(secondary);
+
+      div.addEventListener('click', () => {
+        const input = document.getElementById('input-address') as HTMLTextAreaElement;
+        input.value = res.display_name;
+        currentCoords = { lat: parseFloat(res.lat), lng: parseFloat(res.lon) };
+        container.style.display = 'none';
+        updateSaveBtn();
+      });
+
+      // Also handle enter key for accessibility
+      div.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          div.click();
+        }
+      });
+
+      container.appendChild(div);
+    });
+
+    container.style.display = 'block';
+  }
+
+  function handleAddressInput(e: Event) {
+    const val = (e.target as HTMLTextAreaElement).value.trim();
+    const container = document.getElementById('address-suggestions');
+    const warning = document.getElementById('address-warning');
+
+    // Reset coords when typing manually
+    currentCoords = null;
+
+    if (!val) {
+      if (container) container.style.display = 'none';
+      if (warning) warning.style.display = 'none';
+      return;
+    }
+
+    clearTimeout(autocompleteTimeout);
+    autocompleteTimeout = window.setTimeout(async () => {
+      if (val.length < 3) return;
+      const results = await geocodeAddress(val);
+      renderSuggestions(results);
+    }, 500);
+  }
+
+
   // ── Render ──
   async function renderStops() {
     allStops = await getStops();
@@ -835,6 +736,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     (document.getElementById('input-client-name') as HTMLInputElement).value = '';
     (document.getElementById('input-client-phone') as HTMLInputElement).value = '';
     selectedPriority = 'normal';
+    currentCoords = null;
+    const suggestions = document.getElementById('address-suggestions');
+    if (suggestions) suggestions.style.display = 'none';
+    const warning = document.getElementById('address-warning');
+    if (warning) warning.style.display = 'none';
     updatePriorityBtns();
     updateSaveBtn();
   }
@@ -870,14 +776,24 @@ import MainLayout from '../layouts/MainLayout.astro';
     const address = getAddressValue();
     if (!address) return;
 
-    const lat = (document.getElementById('input-lat') as HTMLInputElement).value;
-    const lng = (document.getElementById('input-lng') as HTMLInputElement).value;
+    let finalLat: number | undefined;
+    let finalLng: number | undefined;
+
+    if (currentMode === 'text' && currentCoords) {
+      finalLat = currentCoords.lat;
+      finalLng = currentCoords.lng;
+    } else {
+      const latStr = (document.getElementById('input-lat') as HTMLInputElement).value;
+      const lngStr = (document.getElementById('input-lng') as HTMLInputElement).value;
+      if (latStr) finalLat = parseFloat(latStr);
+      if (lngStr) finalLng = parseFloat(lngStr);
+    }
 
     const stop: import('../lib/idb').Stop = {
       id:          editingId ?? generateId(),
       address,
-      lat:         lat ? parseFloat(lat) : undefined,
-      lng:         lng ? parseFloat(lng) : undefined,
+      lat:         finalLat,
+      lng:         finalLng,
       priority:    selectedPriority,
       status:      'pending',
       note:        (document.getElementById('input-note') as HTMLInputElement).value.trim() || undefined,
@@ -1208,7 +1124,19 @@ import MainLayout from '../layouts/MainLayout.astro';
     });
 
     // Address input → enable save
-    document.getElementById('input-address')?.addEventListener('input', updateSaveBtn);
+    document.getElementById('input-address')?.addEventListener('input', (e) => {
+      updateSaveBtn();
+      handleAddressInput(e);
+    });
+
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+      const container = document.getElementById('address-suggestions');
+      const input = document.getElementById('input-address');
+      if (container && input && e.target !== input && !container.contains(e.target as Node)) {
+        container.style.display = 'none';
+      }
+    });
     document.getElementById('input-lat')?.addEventListener('input', updateSaveBtn);
     document.getElementById('input-lng')?.addEventListener('input', updateSaveBtn);
     document.getElementById('input-link')?.addEventListener('input', updateSaveBtn);
@@ -1458,6 +1386,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     color: var(--color-accent);
   }
 
+
+
   .detail-row {
     display: flex;
     align-items: center;
@@ -1466,5 +1396,50 @@ import MainLayout from '../layouts/MainLayout.astro';
     border-bottom: 1px solid var(--border-subtle);
     font-size: 0.875rem;
     color: var(--text-secondary);
+  }
+
+  /* Address Suggestions */
+  .suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--surface-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    z-index: 100;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.25rem;
+  }
+  .suggestion-item {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .suggestion-item:last-child {
+    border-bottom: none;
+  }
+  .suggestion-item:hover, .suggestion-item:focus {
+    background: var(--surface-elevated);
+    outline: none;
+  }
+  .suggestion-primary {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 0.125rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .suggestion-secondary {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 </style>
