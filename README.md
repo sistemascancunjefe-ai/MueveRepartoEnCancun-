@@ -44,7 +44,7 @@ Routing:     Nearest-neighbor greedy (JS puro)
 Build:       pnpm + Vite 6
 Deploy:      Render (Node.js Web Service)
 Backend:     Rust + Axum + PostgreSQL (Render)
-Auth:        OTP SMS (Twilio) + JWT 72h
+Auth:        (WIP) OTP SMS + JWT (pendiente de implementar en backend)
 Geocoding:   Nominatim OSM (con caché IDB)
 Scanning:    jsQR (QR) + Tesseract.js (OCR)
 ```
