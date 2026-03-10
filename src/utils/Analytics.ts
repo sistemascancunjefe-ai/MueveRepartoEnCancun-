@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * MueveCancun Telemetry Service
  * Offline-ready analytics that queues events in localStorage and syncs when online.
@@ -16,7 +15,7 @@ type EventName =
 
 interface TelemetryEvent {
   name: EventName;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
   timestamp: number;
 }
 
@@ -31,7 +30,7 @@ class TelemetryService {
     }
   }
 
-  track(name: EventName, params?: Record<string, any>) {
+  track(name: EventName, params?: Record<string, unknown>) {
     const event: TelemetryEvent = {
       name,
       params,

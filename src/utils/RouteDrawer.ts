@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { escapeHtml } from './utils';
 
 // --- Minimal Leaflet Types ---
@@ -9,14 +8,23 @@ interface LatLngExpression extends Array<number> {
     1: number;
 }
 
-interface Map {
-    fitBounds(bounds: any[], options?: any): void;
+interface FitBoundsOptions {
+    padding?: [number, number];
+}
+
+interface LeafletMap {
+    fitBounds(bounds: LatLngExpression[], options?: FitBoundsOptions): void;
+}
+
+interface LeafletLayer {
+    addTo(container: LeafletMap | LayerGroup): this;
+    bindPopup(content: string): this;
 }
 
 interface LayerGroup {
     clearLayers(): void;
     remove(): void;
-    addTo(map: Map): LayerGroup;
+    addTo(map: LeafletMap): LayerGroup;
 }
 
 interface PolylineOptions {
@@ -27,11 +35,20 @@ interface PolylineOptions {
 }
 
 interface MarkerOptions {
-    icon?: any;
+    icon?: unknown;
     radius?: number;
     color?: string;
     fillOpacity?: number;
 }
+
+interface LeafletLike {
+    layerGroup(): LayerGroup;
+    polyline(coords: LatLngExpression[], options: PolylineOptions): LeafletLayer;
+    marker(coords: LatLngExpression, options?: MarkerOptions): LeafletLayer;
+    circleMarker(coords: LatLngExpression, options?: MarkerOptions): LeafletLayer;
+}
+
+type WindowWithLeaflet = Window & { L?: LeafletLike };
 
 // --- Data Types ---
 
@@ -59,11 +76,11 @@ export interface RouteData {
 
 // --- Internal Helpers ---
 
-function createPolyline(L: any, coords: LatLngExpression[], options: PolylineOptions): any {
+function createPolyline(L: LeafletLike, coords: LatLngExpression[], options: PolylineOptions): LeafletLayer {
     return L.polyline(coords, options);
 }
 
-function createMarker(L: any, coords: LatLngExpression, popupContent: string, options?: MarkerOptions): any {
+function createMarker(L: LeafletLike, coords: LatLngExpression, popupContent: string, options?: MarkerOptions): LeafletLayer {
     const marker = options && options.radius
         ? L.circleMarker(coords, options)
         : L.marker(coords, options);
@@ -82,14 +99,14 @@ function createMarker(L: any, coords: LatLngExpression, popupContent: string, op
  * @returns The new LayerGroup containing the drawn route.
  */
 export function drawRoute(
-    map: Map,
+    map: LeafletMap,
     data: RouteData,
     existingLayerGroup: LayerGroup | null | undefined,
     coordinatesDB: Map<string, [number, number]>
 ): LayerGroup | undefined {
 
     // Access global L safely
-    const L = (window as any).L;
+    const L = (window as WindowWithLeaflet).L;
     if (!L || !map) return undefined;
 
     // Reset layers
@@ -101,7 +118,7 @@ export function drawRoute(
 
     // Normalize Data Structure
     // 'data' could be a full Journey (with legs) or a single Route object
-    let legs: any[] = [];
+    let legs: NonNullable<RouteData['legs']> = [];
     if (data.legs && Array.isArray(data.legs)) {
         legs = data.legs;
     } else if (data.paradas && Array.isArray(data.paradas)) {
@@ -115,7 +132,7 @@ export function drawRoute(
     }
 
     const allBounds: LatLngExpression[] = [];
-    const newLayers: any[] = []; // Array to collect all markers before adding to layerGroup
+    const newLayers: LeafletLayer[] = []; // Array to collect all markers before adding to layerGroup
 
     legs.forEach((leg, index) => {
         const routeCoords: LatLngExpression[] = [];
