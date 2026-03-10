@@ -1,14 +1,14 @@
 use axum::{
-    async_trait,
-    extract::FromRequestParts,
+    extract::{FromRef, FromRequestParts},
     http::{request::Parts, StatusCode},
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use std::env;
+use uuid::Uuid;
 
-/// Claims del JWT emitido por /auth/verify-otp
-#[derive(Debug, Serialize, Deserialize, Clone)]
+use crate::state::JwtSecret;
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,   // user UUID
     pub phone: String,
@@ -19,26 +19,26 @@ pub struct Claims {
 /// Extractor para rutas protegidas — devuelve 401 si el token falta o es inválido
 pub struct AuthUser(pub Claims);
 
-#[async_trait]
+/// Extract an authenticated user from the Bearer token.
+///
+/// The JWT secret is pulled from the application state via `FromRef` so it is
+/// loaded once at startup rather than reading `JWT_SECRET` from the environment
+/// on every request (which would panic if the variable is absent).
+#[axum::async_trait]
 impl<S> FromRequestParts<S> for AuthUser
 where
     S: Send + Sync,
+    JwtSecret: FromRef<S>,
 {
     type Rejection = StatusCode;
 
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        let secret = env::var("JWT_SECRET").unwrap_or_else(|_| "dev_secret_change_in_prod".into());
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let TypedHeader(Authorization(bearer)) = parts
+            .extract::<TypedHeader<Authorization<Bearer>>>()
+            .await
+            .map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-        let auth_header = parts
-            .headers
-            .get("authorization")
-            .and_then(|v| v.to_str().ok())
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-
-        let token = auth_header
-            .strip_prefix("Bearer ")
-            .ok_or(StatusCode::UNAUTHORIZED)?;
-
+        let JwtSecret(secret) = JwtSecret::from_ref(state);
         let token_data = decode::<Claims>(
             token,
             &DecodingKey::from_secret(secret.as_bytes()),
@@ -50,20 +50,19 @@ where
     }
 }
 
-/// Extractor opcional — no rechaza si no hay token; devuelve None
-pub struct MaybeAuthUser(pub Option<Claims>);
+/// Mint a signed JWT for the given user.  The caller supplies the secret so
+/// this function never reads from the environment directly.
+pub fn create_token(user_id: Uuid, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    let exp = chrono::Utc::now()
+        .checked_add_signed(chrono::Duration::days(30))
+        .expect("valid timestamp")
+        .timestamp() as usize;
 
-#[async_trait]
-impl<S> FromRequestParts<S> for MaybeAuthUser
-where
-    S: Send + Sync,
-{
-    type Rejection = std::convert::Infallible;
-
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        match AuthUser::from_request_parts(parts, state).await {
-            Ok(AuthUser(claims)) => Ok(MaybeAuthUser(Some(claims))),
-            Err(_) => Ok(MaybeAuthUser(None)),
-        }
-    }
+    let claims = Claims { sub: user_id, exp };
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
 }
+
