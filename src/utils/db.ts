@@ -112,8 +112,6 @@ export const migrateBalanceFromLocalStorage = async (db: Awaited<ReturnType<type
 
     await tx.done;
   } catch (e) {
-    console.log('[DB] Balance migration completed successfully');
-  } catch (e) {
     console.error('[DB] Balance migration failed:', e);
   }
 };
