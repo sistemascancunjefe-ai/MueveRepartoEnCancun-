@@ -206,6 +206,5 @@ describe('safeUrl Utility', () => {
 
   it('should handle empty string correctly', () => {
     expect(safeUrl('')).toBe('');
-main
   });
 });

@@ -27,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
     let pool = db::create_pool().await?;
 
     let allowed_origin = env::var("ALLOWED_ORIGINS")
-        .unwrap_or_else(|_| "https://mueverepartoencancun.onrender.com".to_string());
+        .unwrap_or_else(|_| "http://localhost:4321".to_string());
 
     let cors = CorsLayer::new()
         .allow_origin(allowed_origin.parse::<HeaderValue>()?)
