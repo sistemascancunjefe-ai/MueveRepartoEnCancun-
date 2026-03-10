@@ -179,12 +179,7 @@ const {
       import { setupTheme } from '@utils/theme';
 
       document.addEventListener('astro:page-load', setupTheme);
-
-      if (document.readyState !== 'loading') {
-        setupTheme();
-      } else {
-        window.addEventListener('DOMContentLoaded', setupTheme);
-      }
+      if (document.readyState !== 'loading') setupTheme();
     </script>
     <script is:inline>
       // Repartidor name
