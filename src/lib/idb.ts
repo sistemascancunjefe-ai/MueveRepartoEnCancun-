@@ -56,7 +56,7 @@ export const STORES = {
 } as const;
 
 const DB_NAME    = 'mueve-reparto-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let _db: IDBDatabase | null = null;
 
@@ -113,7 +113,12 @@ export async function dbPutMany<T>(store: string, values: T[]): Promise<void> {
   if (values.length === 0) return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(store, 'readwrite');
+    let settled = false;
+    const settle = (fn: () => void) => { if (!settled) { settled = true; fn(); } };
+
+    // durability:'relaxed' skips the OS-level fsync on each write,
+    // significantly improving throughput for bulk inserts/updates.
+    const tx = db.transaction(store, 'readwrite', { durability: 'relaxed' });
     const os = tx.objectStore(store);
 
     // Guard against multiple rejection calls when both tx.onerror and
