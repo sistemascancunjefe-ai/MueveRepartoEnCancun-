@@ -82,6 +82,8 @@ import MainLayout from '../layouts/MainLayout.astro';
 </MainLayout>
 
 <script>
+  import { saveSession, isLoggedIn } from '../lib/session';
+
   const API_URL = import.meta.env.PUBLIC_API_URL ?? '';
 
   let currentPhone = '';
@@ -250,10 +252,12 @@ import MainLayout from '../layouts/MainLayout.astro';
       }
 
       const data = await res.json();
-      localStorage.setItem('mr-auth-token', data.token);
-      localStorage.setItem('mr-plan', data.plan);
-      localStorage.setItem('mr-user-id', data.user_id);
-      localStorage.setItem('mr-phone', `+52${currentPhone}`);
+      saveSession({
+        token:  data.token,
+        plan:   data.plan ?? 'free',
+        userId: data.user_id ?? '',
+        phone:  `+52${currentPhone}`,
+      });
 
       // Redirigir al origen o /home
       const redirectTo = new URLSearchParams(window.location.search).get('next') ?? '/home';
@@ -308,8 +312,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   // Si ya tiene sesión, redirigir
-  const existing = localStorage.getItem('mr-auth-token');
-  if (existing) window.location.href = '/home';
+  if (isLoggedIn()) window.location.href = '/home';
 </script>
 
 <style>

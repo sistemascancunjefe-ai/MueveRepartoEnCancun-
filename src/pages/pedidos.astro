@@ -294,7 +294,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   import { escapeHtml } from '../utils/utils';
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-
+  import { isPro } from '../lib/session';
 
   let currentFilter = 'all';
   let selectedPriority: 'normal' | 'urgent' = 'normal';
@@ -499,37 +499,56 @@ import MainLayout from '../layouts/MainLayout.astro';
   // -- Address Autocomplete State --
   let currentCoords: { lat: number, lng: number } | null = null;
   let autocompleteTimeout: number | undefined;
+  let searchToken = 0;
 
-  async function searchAddressSuggestions(query: string): Promise<any[]> {
+  // Returns Nominatim results array, { serviceUnavailable: true } on 429/503, or [] on other errors.
+  async function fetchSuggestions(query: string): Promise<any[] | { serviceUnavailable: true }> {
     try {
+      // Add Cancun to query if not present to improve local results
       const q = query.toLowerCase().includes('cancun') || query.toLowerCase().includes('cancún')
         ? query
         : `${query}, Cancún`;
+
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
-      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
-      if (!res.ok) return [];
+      const res = await fetch(url, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      if (res.status === 429 || res.status === 503) {
+        return { serviceUnavailable: true };
+      }
+      if (!res.ok) throw new Error('Network response was not ok');
       return await res.json();
-    } catch {
+    } catch (err) {
+      console.error('Geocoding error:', err);
       return [];
     }
   }
 
-  function renderSuggestions(results: any[]) {
+  function renderSuggestions(results: any[] | { serviceUnavailable: true }) {
     const container = document.getElementById('address-suggestions');
     const warning = document.getElementById('address-warning');
     if (!container || !warning) return;
 
     container.innerHTML = '';
 
-    if (results.length === 0) {
+    if (!Array.isArray(results) && (results as any).serviceUnavailable) {
       container.style.display = 'none';
+      warning.textContent = '⚠️ Servicio de geocodificación no disponible. Inténtalo de nuevo más tarde.';
+      warning.style.display = 'block';
+      return;
+    }
+
+    const arr = results as any[];
+    if (arr.length === 0) {
+      container.style.display = 'none';
+      warning.textContent = '⚠️ Dirección no encontrada. Se guardará sin mapa.';
       warning.style.display = 'block';
       return;
     }
 
     warning.style.display = 'none';
 
-    results.forEach(res => {
+    arr.forEach(res => {
       const div = document.createElement('div');
       div.className = 'suggestion-item';
       div.setAttribute('role', 'option');
@@ -568,7 +587,6 @@ import MainLayout from '../layouts/MainLayout.astro';
     container.style.display = 'block';
   }
 
-
   function handleAddressInput(e: Event) {
     const val = (e.target as HTMLTextAreaElement).value.trim();
     const container = document.getElementById('address-suggestions');
@@ -587,7 +605,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     clearTimeout(autocompleteTimeout);
     autocompleteTimeout = window.setTimeout(async () => {
       const token = ++searchToken;
-      const results = await fetchGeocodeSuggestions(val);
+      const results = await fetchSuggestions(val);
       // Discard stale responses
       if (token !== searchToken) return;
       renderSuggestions(results);
@@ -847,10 +865,6 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   const FREE_LIMIT = parseInt(import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20', 10);
-
-  function isPro(): boolean {
-    return localStorage.getItem('mr-plan') === 'pro';
-  }
 
   function openPaywall() {
     const overlay = document.getElementById('paywall-overlay')!;

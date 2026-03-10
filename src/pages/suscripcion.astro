@@ -81,13 +81,15 @@ const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
 </MainLayout>
 
 <script>
+  import { getSession, clearSession, isPro as checkPro } from '../lib/session';
+
   const API_URL = import.meta.env.PUBLIC_API_URL ?? '';
 
   function renderPlan() {
-    const plan      = localStorage.getItem('mr-plan') ?? 'free';
-    const phone     = localStorage.getItem('mr-phone') ?? '';
-    const userId    = localStorage.getItem('mr-user-id');
-    const isPro     = plan === 'pro';
+    const session   = getSession();
+    const phone     = session?.phone ?? '';
+    const userId    = session?.userId ?? null;
+    const isPro     = checkPro();
 
     const badge   = document.getElementById('plan-badge')!;
     const details = document.getElementById('plan-details')!;
@@ -136,16 +138,13 @@ const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
 
     document.getElementById('btn-logout')?.addEventListener('click', () => {
       if (!confirm('¿Cerrar sesión?')) return;
-      localStorage.removeItem('mr-auth-token');
-      localStorage.removeItem('mr-plan');
-      localStorage.removeItem('mr-user-id');
-      localStorage.removeItem('mr-phone');
+      clearSession();
       window.location.href = '/auth';
     });
   }
 
   async function handleUpgrade() {
-    const token = localStorage.getItem('mr-auth-token');
+    const token = getSession()?.token;
     if (!token) {
       window.location.href = '/auth?next=/suscripcion';
       return;
