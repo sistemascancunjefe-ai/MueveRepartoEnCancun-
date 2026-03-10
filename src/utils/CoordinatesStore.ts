@@ -27,7 +27,7 @@ function isCatalog(value: unknown): value is Catalog {
     return (
         typeof value === 'object' &&
         value !== null &&
-        'rutas' in value &&
+        Object.prototype.hasOwnProperty.call(value, 'rutas') &&
         Array.isArray((value as { rutas?: unknown }).rutas)
     );
 }
