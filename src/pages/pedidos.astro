@@ -500,56 +500,37 @@ import MainLayout from '../layouts/MainLayout.astro';
   // -- Address Autocomplete State --
   let currentCoords: { lat: number, lng: number } | null = null;
   let autocompleteTimeout: number | undefined;
-  let searchToken = 0;
 
-  // Returns Nominatim results array, { serviceUnavailable: true } on 429/503, or [] on other errors.
-  async function fetchGeocodeSuggestions(query: string): Promise<any[] | { serviceUnavailable: true }> {
+  async function searchAddressSuggestions(query: string): Promise<any[]> {
     try {
-      // Add Cancun to query if not present to improve local results
       const q = query.toLowerCase().includes('cancun') || query.toLowerCase().includes('cancún')
         ? query
         : `${query}, Cancún`;
-
       const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5`;
-      const res = await fetch(url, {
-        headers: { 'Accept-Language': 'es' }
-      });
-      if (res.status === 429 || res.status === 503) {
-        return { serviceUnavailable: true };
-      }
-      if (!res.ok) throw new Error('Network response was not ok');
+      const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+      if (!res.ok) return [];
       return await res.json();
-    } catch (err) {
-      console.error('Geocoding error:', err);
+    } catch {
       return [];
     }
   }
 
-  function renderSuggestions(results: any[] | { serviceUnavailable: true }) {
+  function renderSuggestions(results: any[]) {
     const container = document.getElementById('address-suggestions');
     const warning = document.getElementById('address-warning');
     if (!container || !warning) return;
 
     container.innerHTML = '';
 
-    if (!Array.isArray(results) && (results as any).serviceUnavailable) {
+    if (results.length === 0) {
       container.style.display = 'none';
-      warning.textContent = '⚠️ Servicio de geocodificación no disponible. Inténtalo de nuevo más tarde.';
-      warning.style.display = 'block';
-      return;
-    }
-
-    const arr = results as any[];
-    if (arr.length === 0) {
-      container.style.display = 'none';
-      warning.textContent = '⚠️ Dirección no encontrada. Se guardará sin mapa.';
       warning.style.display = 'block';
       return;
     }
 
     warning.style.display = 'none';
 
-    arr.forEach(res => {
+    results.forEach(res => {
       const div = document.createElement('div');
       div.className = 'suggestion-item';
       div.setAttribute('role', 'option');
@@ -587,6 +568,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     container.style.display = 'block';
   }
+
 
   function handleAddressInput(e: Event) {
     const val = (e.target as HTMLTextAreaElement).value.trim();
