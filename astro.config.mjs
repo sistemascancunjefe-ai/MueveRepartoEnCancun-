@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  site: 'https://muevereparto.onrender.com',
+  site: 'https://muevereparto.sistemascancunjefe.com',
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   integrations: [
