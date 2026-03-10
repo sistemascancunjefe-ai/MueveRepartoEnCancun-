@@ -1131,6 +1131,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (worker) {
       tesseractWorker = null;
       await worker.terminate();
+    }
+  }
   async function geocodePendingStops() {
     if (!navigator.onLine) return;
     const stops = await getStops();
