@@ -294,7 +294,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   import { escapeHtml } from '../utils/utils';
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-
+  import { isPro } from '../lib/session';
 
   let currentFilter = 'all';
   let selectedPriority: 'normal' | 'urgent' = 'normal';
@@ -970,10 +970,6 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   const FREE_LIMIT = parseInt(import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20', 10);
-
-  function isPro(): boolean {
-    return localStorage.getItem('mr-plan') === 'pro';
-  }
 
   function openPaywall() {
     const overlay = document.getElementById('paywall-overlay')!;

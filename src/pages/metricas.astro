@@ -160,6 +160,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 <script>
   import { getStops, dbGetAll, STORES } from '../lib/idb';
   import type { Stop, DailyStats } from '../lib/idb';
+  import { getRepartidorName } from '../lib/session';
 
   const WEEK_GOAL_KEY  = 'mr-week-goal';
   const WEEK_GOAL_DEFAULT = 2000;
@@ -289,7 +290,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     const todayIncome  = document.getElementById('today-income')?.textContent ?? '$0';
     const weekTotal    = document.getElementById('week-total-badge')?.textContent?.split(' ')[0] ?? '0';
     const weekIncome   = document.getElementById('roi-income')?.textContent ?? '$0';
-    const repartidor   = localStorage.getItem('mr-repartidor-name') || 'Repartidor';
+    const repartidor   = getRepartidorName() || 'Repartidor';
     const today        = new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 
     return `*Mueve Reparto — Resumen ${today}*\n\n` +

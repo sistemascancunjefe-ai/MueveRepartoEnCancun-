@@ -21,16 +21,16 @@ const navItems = [
     icon: 'route',
   },
   {
+    href: '/enviar',
+    label: 'Notificar',
+    activePattern: /^\/enviar/,
+    icon: 'send',
+  },
+  {
     href: '/metricas',
     label: 'Métricas',
     activePattern: /^\/metricas/,
     icon: 'chart',
-  },
-  {
-    href: '/auth',
-    label: 'Cuenta',
-    activePattern: /^\/(auth|suscripcion)/,
-    icon: 'account',
   },
 ];
 ---
@@ -59,11 +59,11 @@ const navItems = [
               {item.icon === 'route' && (
                 <path d="M20.56 3.91c.39.39.39 1.02 0 1.41l-4.83 4.83-2.37-2.37 1.42-1.42c.39-.39 1.02-.39 1.41 0l.71.71 3.25-3.16c.39-.39 1.02-.39 1.41 0zM4 17.5V21h3.5l10.31-10.32-3.5-3.5L4 17.5zm-1.54 1.67a.996.996 0 000 1.41l1.47 1.47c.39.39 1.02.39 1.41 0l1.15-1.15-3.88-3.88-1.15 1.15z"/>
               )}
+              {item.icon === 'send' && (
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              )}
               {item.icon === 'chart' && (
                 <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z"/>
-              )}
-              {item.icon === 'account' && (
-                <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
               )}
             </svg>
           </div>
@@ -95,7 +95,7 @@ const navItems = [
 
   .mr-nav-inner {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     height: var(--bottom-nav-h);
     max-width: 28rem;
     margin: 0 auto;
