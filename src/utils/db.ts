@@ -64,13 +64,10 @@ export const migrateBalanceFromLocalStorage = async (db: Awaited<ReturnType<type
 
     // Priority: muevecancun_balance (wallet.astro) > user_balance (RouteCalculator.astro)
     let localBalance: number | null = null;
-    let source = '';
-
     // Try muevecancun_balance first (wallet page)
     const muevecancunBalance = localStorage.getItem('muevecancun_balance');
     if (muevecancunBalance !== null) {
       localBalance = parseFloat(muevecancunBalance);
-      source = 'muevecancun_balance';
     }
 
     // Try user_balance if muevecancun_balance not found
@@ -78,7 +75,6 @@ export const migrateBalanceFromLocalStorage = async (db: Awaited<ReturnType<type
       const userBalance = localStorage.getItem('user_balance');
       if (userBalance !== null) {
         localBalance = parseFloat(userBalance);
-        source = 'user_balance';
       }
     }
 
@@ -115,6 +111,7 @@ export const migrateBalanceFromLocalStorage = async (db: Awaited<ReturnType<type
     localStorage.removeItem('user_balance');
 
     await tx.done;
+  } catch (e) {
     console.log('[DB] Balance migration completed successfully');
   } catch (e) {
     console.error('[DB] Balance migration failed:', e);

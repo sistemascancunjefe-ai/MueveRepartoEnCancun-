@@ -60,6 +60,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div class="mode-tabs" role="group" aria-label="Modo de captura">
     <button class="mode-tab active" data-mode="text"   aria-pressed="true">Texto</button>
     <button class="mode-tab"        data-mode="coords" aria-pressed="false">Coords</button>
+    <button class="mode-tab"        data-mode="ocr"    aria-pressed="false">OCR</button>
     <button class="mode-tab"        data-mode="link"   aria-pressed="false">Link</button>
     <button class="mode-tab"        data-mode="qr"     aria-pressed="false">QR</button>
   </div>
@@ -72,9 +73,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     <div style="position:relative;">
       <textarea id="input-address" class="input" rows="2"
                 placeholder="Av. Tulum #123, SM 5, Cancún..."
-                style="resize:none;border-radius:var(--radius-lg);" aria-describedby="address-warning"></textarea>
+                style="resize:none;border-radius:var(--radius-lg);"></textarea>
       <div id="address-suggestions" class="suggestions-dropdown" style="display:none;" role="listbox"></div>
-      <p id="address-warning" role="status" aria-live="polite" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;"></p>
+      <p id="address-warning" style="display:none;color:var(--color-accent);font-size:0.75rem;margin-top:0.375rem;font-weight:600;">
+        ⚠️ Dirección no encontrada. Se guardará sin mapa.
+      </p>
     </div>
   </div>
 
@@ -89,6 +92,48 @@ import MainLayout from '../layouts/MainLayout.astro';
       Usar mi ubicación
     </button>
     <input id="input-address-from-coords" type="hidden" />
+  </div>
+
+  <!-- OCR mode -->
+  <div id="mode-ocr" class="mode-panel" style="display:none;">
+    <div style="background:var(--surface-elevated);border:1px solid var(--border-light);border-radius:var(--radius-lg);padding:1rem;text-align:center;">
+      <p style="font-size:0.875rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem;">Escanear Captura de Pantalla</p>
+
+      <div style="margin-bottom:1rem;">
+        <input type="file" id="ocr-input-file" accept="image/*" style="display:none;" />
+        <button id="btn-ocr-take-photo" class="btn-secondary btn-md" style="margin:0 auto; display:flex; gap:0.5rem; align-items:center;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>
+          Seleccionar o Tomar Foto
+        </button>
+      </div>
+
+      <div id="ocr-preview-container" style="display:none; margin-bottom:1rem;">
+        <img id="ocr-preview-img" src="" alt="Preview" style="max-width:100%; max-height:200px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle);" />
+      </div>
+
+      <button id="btn-ocr-extract" class="btn-primary btn-sm" style="margin:0 auto; display:none;">
+        Extraer dirección
+      </button>
+
+      <div id="ocr-progress-container" style="display:none; margin-top:1rem;">
+        <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">
+          <span id="ocr-progress-status">Inicializando...</span>
+          <span id="ocr-progress-percentage">0%</span>
+        </div>
+        <div style="width:100%; background:var(--surface-input); height:6px; border-radius:3px; overflow:hidden;">
+          <div id="ocr-progress-bar" style="width:0%; height:100%; background:var(--color-primary); transition:width 0.2s;"></div>
+        </div>
+      </div>
+
+      <div id="ocr-result-container" style="display:none; margin-top:1rem; text-align:left;">
+        <label class="field-label">Texto Extraído</label>
+        <textarea id="ocr-textarea-result" class="input" rows="3" style="resize:vertical; border-radius:var(--radius-md); font-size:0.8125rem; font-family:monospace; margin-bottom:0.5rem;"></textarea>
+        <button id="btn-ocr-use-address" class="btn-secondary btn-sm" style="width:100%;">
+          Usar esta dirección
+        </button>
+      </div>
+
+    </div>
   </div>
 
   <!-- Link mode -->
@@ -224,11 +269,32 @@ import MainLayout from '../layouts/MainLayout.astro';
   <div id="detail-content"></div>
 </div>
 
+<!-- ──────────────── -->
+<!-- Paywall modal   -->
+<!-- ──────────────── -->
+<div id="paywall-overlay" class="bottom-sheet-overlay" aria-hidden="true"></div>
+<div id="paywall-sheet" class="bottom-sheet" role="dialog" aria-label="Límite alcanzado" aria-modal="true">
+  <div class="sheet-handle"></div>
+  <div style="text-align:center;padding:0.5rem 0 1rem;">
+    <div style="font-size:2.5rem;margin-bottom:0.5rem;">🚀</div>
+    <h2 style="font-size:1.25rem;font-weight:900;color:var(--text-primary);margin:0 0 0.5rem;">Límite del plan gratuito</h2>
+    <p style="font-size:0.875rem;color:var(--text-secondary);margin:0 0 1.25rem;line-height:1.5;">
+      Has alcanzado las <strong style="color:var(--color-accent);">20 paradas activas</strong> del plan gratuito.<br/>
+      Actualiza a <strong style="color:var(--color-primary);">Pro</strong> para paradas ilimitadas.
+    </p>
+    <a href="/suscripcion" class="btn-primary btn-lg" style="display:block;width:100%;text-align:center;text-decoration:none;margin-bottom:0.5rem;">
+      Ver plan Pro — $99/mes
+    </a>
+    <button id="paywall-close" class="btn-secondary btn-md" style="width:100%;">
+      Cerrar
+    </button>
+  </div>
+</div>
+
 <script>
   import { escapeHtml } from '../utils/utils';
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-  import { escapeHtml } from '../utils/utils';
 
 
   let currentFilter = 'all';
@@ -579,7 +645,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     listEl.innerHTML = filtered.map((s, i) => `
       <div class="stop-card ${s.status === 'completed' ? 'completed' : ''} ${s.priority === 'urgent' ? 'priority-urgent' : 'priority-normal'}"
-           data-id="${s.id}" role="button" tabindex="0" aria-label="Parada ${s.order + 1}: ${escapeHtml(s.address)}">
+           data-id="${s.id}" data-order="${s.order}" draggable="true" role="button" tabindex="0" aria-label="Parada ${s.order + 1}: ${escapeHtml(s.address)}">
 
         <!-- Drag handle -->
         <div class="drag-handle" aria-hidden="true">
@@ -624,6 +690,84 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // Bind events on stop cards
     listEl.querySelectorAll('.stop-card').forEach(card => {
+      // Drag and Drop
+      card.addEventListener('dragstart', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        const index = target.dataset.index;
+        if (index === null || index === undefined) return;
+        e.dataTransfer.setData('text/plain', index);
+        e.dataTransfer.effectAllowed = 'move';
+        target.classList.add('dragging');
+      });
+
+      card.addEventListener('dragend', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('dragging');
+        // Clear any lingering drag-over states (e.g. cancelled drag)
+        listEl.querySelectorAll('.stop-card.drag-over').forEach((el: Element) => {
+          el.classList.remove('drag-over');
+        });
+      });
+
+      card.addEventListener('dragover', (e: any) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const target = e.currentTarget as HTMLElement;
+        target.classList.add('drag-over');
+      });
+
+      card.addEventListener('dragleave', (e: any) => {
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+      });
+
+      card.addEventListener('drop', async (e: any) => {
+        e.preventDefault();
+        const target = e.currentTarget as HTMLElement;
+        target.classList.remove('drag-over');
+
+        const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
+        const dropIndex = parseInt(target.getAttribute('data-index')!, 10);
+
+        if (dragIndex === dropIndex || isNaN(dragIndex) || isNaN(dropIndex)) return;
+
+        // Identificamos el id del elemento donde se soltó ANTES de reordenar
+        const targetId = filtered[dropIndex].id;
+
+        // Reorder logic en filtered
+        // When dragging downward the splice shifts indices, so adjust insertion point
+        const item = filtered.splice(dragIndex, 1)[0];
+        const insertAt = dragIndex < dropIndex ? dropIndex - 1 : dropIndex;
+        filtered.splice(insertAt, 0, item);
+
+        // Update orders to match new positions
+        if (currentFilter === 'all') {
+          const promises = filtered.map((stop, idx) => {
+            stop.order = idx;
+            return dbPut(STORES.STOPS, stop);
+          });
+          await Promise.all(promises);
+        } else {
+          // Si estamos filtrando, buscar su índice en allStops
+          const allStopsItemIndex = allStops.findIndex(s => s.id === item.id);
+          const allStopsTargetIndex = allStops.findIndex(s => s.id === targetId);
+
+          if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
+            const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
+            // Adjust for direction shift, mirroring the filtered reorder adjustment
+            const allInsertAt = allStopsItemIndex < allStopsTargetIndex ? allStopsTargetIndex - 1 : allStopsTargetIndex;
+            allStops.splice(allInsertAt, 0, removedItem);
+
+            const promises = allStops.map((stop, idx) => {
+              stop.order = idx;
+              return dbPut(STORES.STOPS, stop);
+            });
+            await Promise.all(promises);
+          }
+        }
+
+        await renderStops();
+      });
       card.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.closest('.stop-action-btn')) return;
@@ -651,6 +795,61 @@ import MainLayout from '../layouts/MainLayout.astro';
         }
       });
     });
+
+    // ── Drag-and-drop reordering ──
+    let dragSrcId: string | null = null;
+
+    listEl.querySelectorAll<HTMLElement>('.stop-card').forEach(card => {
+      card.addEventListener('dragstart', (e) => {
+        dragSrcId = card.dataset.id!;
+        card.classList.add('dragging');
+        e.dataTransfer!.effectAllowed = 'move';
+      });
+
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+        listEl.querySelectorAll('.stop-card').forEach(c => c.classList.remove('drag-over'));
+      });
+
+      card.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer!.dropEffect = 'move';
+        listEl.querySelectorAll('.stop-card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      });
+
+      card.addEventListener('dragleave', () => {
+        card.classList.remove('drag-over');
+      });
+
+      card.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const dropId = card.dataset.id!;
+        if (!dragSrcId || dragSrcId === dropId) return;
+
+        // Reordenar: intercambiar los valores de `order`
+        const allCurrent = await getStops();
+        const src  = allCurrent.find(s => s.id === dragSrcId);
+        const dest = allCurrent.find(s => s.id === dropId);
+        if (!src || !dest) return;
+
+        const srcOrder  = src.order;
+        const destOrder = dest.order;
+
+        // Shift stops entre src y dest
+        const updated: import('../lib/idb').Stop[] = allCurrent.map(s => {
+          if (s.id === dragSrcId) return { ...s, order: destOrder };
+          if (srcOrder < destOrder && s.order > srcOrder && s.order <= destOrder) return { ...s, order: s.order - 1 };
+          if (srcOrder > destOrder && s.order >= destOrder && s.order < srcOrder) return { ...s, order: s.order + 1 };
+          return s;
+        });
+
+        await Promise.all(updated.map(s => dbPut(STORES.STOPS, s)));
+        dragSrcId = null;
+        await renderStops();
+      });
+    });
   }
 
   function filterStops(stops: Stop[], filter: string): Stop[] {
@@ -662,8 +861,33 @@ import MainLayout from '../layouts/MainLayout.astro';
     }
   }
 
+  const FREE_LIMIT = parseInt(import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20', 10);
+
+  function isPro(): boolean {
+    return localStorage.getItem('mr-plan') === 'pro';
+  }
+
+  function openPaywall() {
+    const overlay = document.getElementById('paywall-overlay')!;
+    const sheet   = document.getElementById('paywall-sheet')!;
+    overlay.classList.add('open');
+    sheet.classList.add('open');
+    overlay.setAttribute('aria-hidden', 'false');
+  }
+
+  function closePaywall() {
+    document.getElementById('paywall-overlay')!.classList.remove('open');
+    document.getElementById('paywall-sheet')!.classList.remove('open');
+    document.getElementById('paywall-overlay')!.setAttribute('aria-hidden', 'true');
+  }
+
   // ── Add Sheet ──
   function openAddSheet() {
+    const activeStops = allStops.filter(s => s.status !== 'completed').length;
+    if (!isPro() && activeStops >= FREE_LIMIT) {
+      openPaywall();
+      return;
+    }
     editingId = null;
     clearForm();
     const overlay = document.getElementById('add-overlay')!;
@@ -692,6 +916,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     (document.getElementById('input-client-phone') as HTMLInputElement).value = '';
     selectedPriority = 'normal';
     currentCoords = null;
+    linkCoords = null;
     const suggestions = document.getElementById('address-suggestions');
     if (suggestions) suggestions.style.display = 'none';
     const warning = document.getElementById('address-warning');
@@ -699,6 +924,34 @@ import MainLayout from '../layouts/MainLayout.astro';
     updatePriorityBtns();
     updateSaveBtn();
   }
+
+  // Extrae { lat, lng } de URLs de Google Maps, Waze, Apple Maps, etc.
+  function parseCoordsFromMapUrl(url: string): { lat: number; lng: number } | null {
+    const patterns = [
+      // Google Maps: /maps/@LAT,LNG o /@LAT,LNG,zoom o ?q=LAT,LNG o &ll=LAT,LNG
+      /[/@?&](-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Waze: ?ll=LAT,LNG o &ll=LAT,LNG
+      /[?&]ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Apple Maps: ?ll=LAT,LNG
+      /\?ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+      // Genérico: lat=LAT&lng=LNG o lat=LAT&lon=LNG
+      /lat=(-?\d+\.?\d*)&lon[g]?=(-?\d+\.?\d*)/i,
+    ];
+    for (const re of patterns) {
+      const m = url.match(re);
+      if (m) {
+        const lat = parseFloat(m[1]);
+        const lng = parseFloat(m[2]);
+        // Validar rangos
+        if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+          return { lat, lng };
+        }
+      }
+    }
+    return null;
+  }
+
+  let linkCoords: { lat: number; lng: number } | null = null;
 
   function getAddressValue(): string {
     switch (currentMode) {
@@ -865,12 +1118,16 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── Mode tabs ──
   function switchMode(mode: string) {
+
+    if (currentMode === 'ocr' && mode !== 'ocr') {
+      cleanupOcr();
+    }
     currentMode = mode;
     document.querySelectorAll('.mode-tab').forEach(t => {
       t.classList.toggle('active', (t as HTMLElement).dataset.mode === mode);
       (t as HTMLButtonElement).setAttribute('aria-pressed', String((t as HTMLElement).dataset.mode === mode));
     });
-    ['text','coords','link','qr'].forEach(m => {
+    ['text','coords','ocr','link','qr'].forEach(m => {
       const panel = document.getElementById(`mode-${m}`)!;
       panel.style.display = m === mode ? 'block' : 'none';
     });
@@ -967,6 +1224,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     document.getElementById('close-sheet')?.addEventListener('click', closeAddSheet);
     document.getElementById('add-overlay')?.addEventListener('click', closeAddSheet);
     document.getElementById('detail-overlay')?.addEventListener('click', closeDetail);
+    document.getElementById('paywall-close')?.addEventListener('click', closePaywall);
+    document.getElementById('paywall-overlay')?.addEventListener('click', closePaywall);
 
     document.getElementById('btn-save-stop')?.addEventListener('click', saveStop);
     // Filter tabs
@@ -1021,6 +1280,122 @@ import MainLayout from '../layouts/MainLayout.astro';
         updateSaveBtn();
       });
     });
+
+
+    // OCR tab events
+    const ocrInputFile = document.getElementById('ocr-input-file') as HTMLInputElement;
+    const btnTakePhoto = document.getElementById('btn-ocr-take-photo');
+    const previewContainer = document.getElementById('ocr-preview-container');
+    const previewImg = document.getElementById('ocr-preview-img') as HTMLImageElement;
+    const btnExtract = document.getElementById('btn-ocr-extract');
+    const progressContainer = document.getElementById('ocr-progress-container');
+    const resultContainer = document.getElementById('ocr-result-container');
+
+    if (btnTakePhoto) {
+      btnTakePhoto.addEventListener('click', () => {
+        ocrInputFile?.click();
+      });
+    }
+
+    if (ocrInputFile) {
+      ocrInputFile.addEventListener('change', (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          // Revoke any previously tracked blob URL before creating a new one
+          if (currentPreviewUrl) {
+            URL.revokeObjectURL(currentPreviewUrl);
+          }
+          const url = URL.createObjectURL(file);
+          currentPreviewUrl = url;
+          if (previewImg) {
+            previewImg.src = url;
+            previewImg.onload = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+            previewImg.onerror = () => {
+              URL.revokeObjectURL(url);
+              if (currentPreviewUrl === url) currentPreviewUrl = null;
+            };
+          }
+          if (previewContainer) previewContainer.style.display = 'block';
+          if (btnExtract) btnExtract.style.display = 'block';
+          if (progressContainer) progressContainer.style.display = 'none';
+          if (resultContainer) resultContainer.style.display = 'none';
+        }
+      });
+    }
+
+    if (btnExtract) {
+      btnExtract.addEventListener('click', () => {
+        extractOcrText();
+      });
+    }
+
+    const btnUseAddress = document.getElementById('btn-ocr-use-address');
+    if (btnUseAddress) {
+      btnUseAddress.addEventListener('click', () => {
+        const text = (document.getElementById('ocr-textarea-result') as HTMLTextAreaElement).value;
+        if (!text) return;
+
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+        // Extract phone number (e.g., 10 digits)
+        const phoneRegex = /(?:\+?52)?(?:\s*-)?(?:\d[\s-]?){10}/;
+        const phoneMatch = text.match(phoneRegex);
+        if (phoneMatch) {
+            const inputPhone = document.getElementById('input-client-phone') as HTMLInputElement;
+            if (inputPhone) inputPhone.value = phoneMatch[0].replace(/[\s-]/g, '').slice(-10);
+        }
+
+        // Try to identify Name and Address heuristically
+        // E.g., if line 1 has no numbers it might be the name.
+        // If line 2 has numbers and street names (Calle, Av, SM, Mz, Lt), it's the address.
+        let potentialAddress = "";
+        let potentialName = "";
+        let notes = "";
+
+        for (const line of lines) {
+           const lower = line.toLowerCase();
+           if (lower.includes('calle') || lower.includes('av') || lower.includes('sm') || lower.includes('mz') || lower.includes('lt') || lower.includes('mza') || lower.includes('lote') || lower.includes('c.')) {
+              if (potentialAddress.length > 0) potentialAddress += " " + line;
+              else potentialAddress = line;
+           } else if (line.length > 2 && line.length < 40 && !phoneRegex.test(line) && potentialName === "") {
+              // Could be name if no address keywords and no phone number
+              potentialName = line;
+           } else {
+              if (!line.match(phoneRegex)) {
+                  notes += line + " ";
+              }
+           }
+        }
+
+        if (!potentialAddress) {
+            // If heuristics fail, just use the first non-phone line as address
+            potentialAddress = lines.find(l => !l.match(phoneRegex) && l !== potentialName) || text;
+        }
+
+        const inputAddress = document.getElementById('input-address') as HTMLTextAreaElement;
+        if (inputAddress) {
+            inputAddress.value = potentialAddress.trim();
+            // Trigger input event for validation
+            inputAddress.dispatchEvent(new Event('input'));
+        }
+
+        const inputName = document.getElementById('input-client-name') as HTMLInputElement;
+        if (inputName && potentialName) {
+            inputName.value = potentialName.trim();
+        }
+
+        const inputNote = document.getElementById('input-note') as HTMLInputElement;
+        if (inputNote && notes.trim().length > 0) {
+            inputNote.value = notes.trim().substring(0, 100);
+        }
+
+        switchMode('text');
+      });
+    }
+
 
     renderStops();
     setTimeout(() => geocodePendingStops(), 2000);
@@ -1148,6 +1523,17 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   .stop-card:active { transform: scale(0.99); }
+
+  .stop-card.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+  }
+
+  .stop-card.drag-over {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(0, 232, 162, 0.25);
+    transform: scale(1.01);
+  }
 
   .stop-card.completed {
     opacity: 0.5;

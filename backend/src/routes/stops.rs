@@ -4,9 +4,10 @@ use axum::{
     Json,
 };
 use sqlx::PgPool;
+use std::env;
 use uuid::Uuid;
 
-use crate::{middleware::device::DeviceId, models::*};
+use crate::{middleware::{auth::MaybeAuthUser, device::DeviceId}, models::*};
 
 /// GET /stops — Lista paradas del dispositivo ordenadas por stop_order
 pub async fn list_stops(
@@ -33,6 +34,7 @@ pub async fn list_stops(
 /// POST /stops — Crear parada nueva
 pub async fn create_stop(
     DeviceId(device_id): DeviceId,
+    MaybeAuthUser(auth): MaybeAuthUser,
     State(pool): State<PgPool>,
     Json(body): Json<CreateStop>,
 ) -> Result<(StatusCode, Json<Stop>), StatusCode> {
