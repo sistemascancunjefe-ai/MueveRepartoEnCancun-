@@ -649,9 +649,10 @@ import MainLayout from '../layouts/MainLayout.astro';
   let ocrRunId = 0;
 
   async function destroyOcrWorker() {
-    if (tesseractWorker) {
-      await tesseractWorker.terminate();
+    const worker = tesseractWorker;
+    if (worker) {
       tesseractWorker = null;
+      await worker.terminate();
     }
   }
 
