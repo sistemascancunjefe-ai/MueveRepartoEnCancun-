@@ -119,7 +119,6 @@ export async function dbPutMany<T>(store: string, values: T[]): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror    = () => reject(tx.error);
     tx.onabort    = () => {
-      // If abort was triggered without an error, still reject to signal failure
       if (tx.error) {
         reject(tx.error);
       } else {
