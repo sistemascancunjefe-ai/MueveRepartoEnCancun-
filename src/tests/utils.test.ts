@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, safeJsonStringify, getDistance, truncateText, readingTime } from '../utils/utils';
-import { escapeHtml, safeJsonStringify, getDistance, truncateText, safeUrl } from '../utils/utils';
+import { escapeHtml, safeJsonStringify, getDistance, truncateText, readingTime, safeUrl } from '../utils/utils';
 
 describe('escapeHtml Utility', () => {
   it('should escape HTML characters in strings', () => {
