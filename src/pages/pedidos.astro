@@ -273,6 +273,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES } from '../lib/idb';
   import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
   import type { Stop } from '../lib/idb';
+  import { escapeHtml } from '../utils/utils';
 
 
   let currentFilter = 'all';
