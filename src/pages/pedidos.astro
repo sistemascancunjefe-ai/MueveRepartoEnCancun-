@@ -1121,6 +1121,16 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
 
+  // ── OCR Logic ──
+  let tesseractWorker: any = null;
+  let currentPreviewUrl: string | null = null;
+  let ocrRunId = 0;
+
+  async function destroyOcrWorker() {
+    const worker = tesseractWorker;
+    if (worker) {
+      tesseractWorker = null;
+      await worker.terminate();
   async function geocodePendingStops() {
     if (!navigator.onLine) return;
     const stops = await getStops();
