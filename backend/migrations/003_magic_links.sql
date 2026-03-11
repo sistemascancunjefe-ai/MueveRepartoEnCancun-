@@ -1,17 +1,30 @@
 -- Migration 003: Magic Link auth (reemplaza OTP / Twilio)
 -- Agrega email a users, crea magic_tokens
 
+-- Hacer opcional el phone heredado de migraciones 001/002 para permitir usuarios solo con email
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'users'
+      AND column_name = 'phone'
+  ) THEN
+    EXECUTE 'ALTER TABLE users ALTER COLUMN phone DROP NOT NULL';
+  END IF;
+END$$;
+
 -- Email como nuevo identificador principal del usuario
 ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
--- Constraint único por email (solo si la columna se acaba de crear)
+-- Constraint único por email (índice completo para que ON CONFLICT (email) funcione correctamente)
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_indexes WHERE tablename = 'users' AND indexname = 'idx_users_email'
   ) THEN
-    CREATE UNIQUE INDEX idx_users_email ON users (email) WHERE email IS NOT NULL;
+    CREATE UNIQUE INDEX idx_users_email ON users (email);
   END IF;
 END$$;
 

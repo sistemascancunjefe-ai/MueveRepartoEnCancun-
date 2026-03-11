@@ -43,6 +43,9 @@ export function clearSession(): void {
   Object.values(KEYS).forEach(k => {
     if (k !== KEYS.NAME) localStorage.removeItem(k);
   });
+  // Limpiar claves adicionales no declaradas en KEYS
+  localStorage.removeItem('mr-stripe-session');
+  localStorage.removeItem('mr-phone'); // legado v1 (OTP/SMS)
 }
 
 /** Guard síncrono para UI — no async para no bloquear renders. */

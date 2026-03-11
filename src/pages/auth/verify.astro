@@ -60,7 +60,13 @@ import MainLayout from '../../layouts/MainLayout.astro';
       });
 
       showState('success');
-      const next = new URLSearchParams(window.location.search).get('next') ?? '/home';
+      const rawNext = new URLSearchParams(window.location.search).get('next');
+      const next =
+        typeof rawNext === 'string' &&
+        rawNext.startsWith('/') &&
+        !rawNext.startsWith('//')
+          ? rawNext
+          : '/home';
       setTimeout(() => { window.location.href = next; }, 800);
     } catch {
       showState('error');
