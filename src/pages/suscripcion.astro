@@ -1,10 +1,16 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
-const proPriceMxn = import.meta.env.PUBLIC_PRO_PRICE_MXN ?? '99';
-const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
+const proPriceMxn        = import.meta.env.PUBLIC_PRO_PRICE_MXN ?? '99';
+const freeLimit          = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
+const stripePubKey       = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_live_51T6oKE2dM2f4HRxoh2mpjFg4MHpHXxqc65ulAos4p22xPpD3v55ejGpiGx1Y8vdK5doYMTPGvTPi6RzsqdVv2xvE000caSvFag';
+const stripeBuyButtonId  = import.meta.env.PUBLIC_STRIPE_BUY_BUTTON_ID ?? 'buy_btn_1T9Y4E2dM2f4HRxoylh2M7Z4';
 ---
 
 <MainLayout title="Mi suscripción">
+  <!-- Script Stripe en <head> para que el custom element se defina antes de renderizar -->
+  <Fragment slot="head">
+    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+  </Fragment>
   <div class="subs-page px-4 pt-4">
 
     <div class="page-header stagger-item">
@@ -50,8 +56,15 @@ const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
         </li>
       </ul>
 
+      <!-- Stripe Buy Button (visible solo si plan free) -->
       <div id="pro-cta" class="pro-cta">
-        <!-- Dinámico según plan actual -->
+        <div id="stripe-btn-wrapper">
+          <stripe-buy-button
+            buy-button-id={stripeBuyButtonId}
+            publishable-key={stripePubKey}
+          ></stripe-buy-button>
+        </div>
+        <p class="pay-note">Pago seguro con Stripe · Cancela cuando quieras</p>
       </div>
     </div>
 
@@ -83,74 +96,54 @@ const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
 <script>
   import { getSession, clearSession, isPro as checkPro } from '../lib/session';
 
-  const API_URL = import.meta.env.PUBLIC_API_URL ?? '';
-
   function renderPlan() {
-    const session   = getSession();
-    const phone     = session?.phone ?? '';
-    const userId    = session?.userId ?? null;
-    const isPro     = checkPro();
+    const session  = getSession();
+    const email    = session?.email ?? '';
+    const userId   = session?.userId ?? null;
+    const isPro    = checkPro();
 
-    const badge   = document.getElementById('plan-badge')!;
-    const details = document.getElementById('plan-details')!;
-    const proCta  = document.getElementById('pro-cta')!;
-    const freeInfo = document.getElementById('free-info')!;
+    const badge          = document.getElementById('plan-badge')!;
+    const details        = document.getElementById('plan-details')!;
+    const freeInfo       = document.getElementById('free-info')!;
+    const stripeBtnWrap  = document.getElementById('stripe-btn-wrapper')!;
+    const proCta         = document.getElementById('pro-cta')!;
     const accountSection = document.getElementById('account-section')!;
     const accountPhone   = document.getElementById('account-phone')!;
 
     if (isPro) {
-      badge.textContent = 'Plan Pro';
+      badge.textContent = 'Plan Pro ✦';
       badge.className   = 'plan-badge plan-pro';
-      details.innerHTML = '<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Paradas ilimitadas activas</p>';
-      proCta.innerHTML  = `<p style="font-size:0.875rem;font-weight:700;color:var(--color-primary);text-align:center;padding:0.75rem;">
-        ✅ Ya tienes el plan Pro
+      details.innerHTML = '<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Paradas ilimitadas · Historial 90 días</p>';
+      // Ocultar botón Stripe y mostrar mensaje pro
+      stripeBtnWrap.style.display = 'none';
+      proCta.innerHTML = `<p style="font-size:0.875rem;font-weight:700;color:var(--color-primary);text-align:center;padding:0.75rem 0 0;">
+        ✅ Ya tienes el plan Pro activo
       </p>`;
       freeInfo.style.display = 'none';
     } else {
       badge.textContent = 'Plan Gratuito';
       badge.className   = 'plan-badge plan-free';
-      details.innerHTML = '<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Hasta 20 paradas activas por día</p>';
-      proCta.innerHTML  = `
-        <button id="btn-upgrade-card" class="btn-primary btn-lg" style="width:100%;margin-bottom:0.5rem;">
-          Actualizar a Pro — $99/mes
-        </button>
-        <p style="font-size:0.75rem;color:var(--text-tertiary);text-align:center;">
-          Próximamente: pago con tarjeta u OXXO Pay (Conekta)
-        </p>`;
-
-      document.getElementById('btn-upgrade-card')?.addEventListener('click', handleUpgrade);
+      details.innerHTML = `<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Hasta 20 paradas activas por día</p>`;
+      // El script de Stripe ya se cargó en <head> vía slot — no hacer nada aquí
     }
 
-    // Auth section
+    // Sección cuenta
+    accountSection.style.display = 'block';
     if (userId) {
-      accountSection.style.display = 'block';
-      accountPhone.textContent = phone || 'Cuenta activa';
+      accountPhone.textContent = email || 'Cuenta activa';
+      document.getElementById('btn-logout')?.addEventListener('click', () => {
+        if (!confirm('¿Cerrar sesión?')) return;
+        clearSession();
+        window.location.href = '/auth';
+      });
     } else {
-      accountSection.style.display = 'block';
-      accountPhone.textContent = 'Sin cuenta — modo offline';
+      accountPhone.textContent = 'Sin cuenta — datos guardados en este dispositivo';
       const btnLogout = document.getElementById('btn-logout')!;
       btnLogout.textContent = 'Iniciar sesión';
       btnLogout.classList.remove('btn-danger');
       btnLogout.classList.add('btn-primary');
       btnLogout.addEventListener('click', () => { window.location.href = '/auth'; });
-      return;
     }
-
-    document.getElementById('btn-logout')?.addEventListener('click', () => {
-      if (!confirm('¿Cerrar sesión?')) return;
-      clearSession();
-      window.location.href = '/auth';
-    });
-  }
-
-  async function handleUpgrade() {
-    const token = getSession()?.token;
-    if (!token) {
-      window.location.href = '/auth?next=/suscripcion';
-      return;
-    }
-    // TODO P5.2: integrar Conekta Checkout aquí
-    alert('El pago con Conekta estará disponible próximamente.\nContacta soporte por WhatsApp para activar tu plan Pro.');
   }
 
   document.addEventListener('astro:page-load', renderPlan);
@@ -340,5 +333,17 @@ const freeLimit   = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
     font-weight: 700;
     color: var(--text-primary);
     margin: 0;
+  }
+
+  .pay-note {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    text-align: center;
+    margin: 0.5rem 0 0;
+  }
+
+  /* Forzar que el stripe-buy-button ocupe ancho completo */
+  stripe-buy-button {
+    width: 100%;
   }
 </style>

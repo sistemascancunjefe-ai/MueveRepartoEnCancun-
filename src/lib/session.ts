@@ -10,7 +10,7 @@ const KEYS = {
   TOKEN:  'mr-auth-token',
   PLAN:   'mr-plan',
   USER:   'mr-user-id',
-  PHONE:  'mr-phone',
+  EMAIL:  'mr-email',
   NAME:   'mr-repartidor-name',
 } as const;
 
@@ -18,7 +18,7 @@ export interface Session {
   token:  string;
   plan:   'free' | 'pro';
   userId: string;
-  phone:  string;
+  email:  string;
 }
 
 export function getSession(): Session | null {
@@ -28,20 +28,19 @@ export function getSession(): Session | null {
     token,
     plan:   (localStorage.getItem(KEYS.PLAN) ?? 'free') as 'free' | 'pro',
     userId: localStorage.getItem(KEYS.USER) ?? '',
-    phone:  localStorage.getItem(KEYS.PHONE) ?? '',
+    email:  localStorage.getItem(KEYS.EMAIL) ?? '',
   };
 }
 
 export function saveSession(data: Session): void {
-  localStorage.setItem(KEYS.TOKEN,  data.token);
-  localStorage.setItem(KEYS.PLAN,   data.plan);
-  localStorage.setItem(KEYS.USER,   data.userId);
-  localStorage.setItem(KEYS.PHONE,  data.phone);
+  localStorage.setItem(KEYS.TOKEN, data.token);
+  localStorage.setItem(KEYS.PLAN,  data.plan);
+  localStorage.setItem(KEYS.USER,  data.userId);
+  localStorage.setItem(KEYS.EMAIL, data.email);
 }
 
 export function clearSession(): void {
   Object.values(KEYS).forEach(k => {
-    // Conservar nombre del repartidor — no es sesión de auth
     if (k !== KEYS.NAME) localStorage.removeItem(k);
   });
 }
@@ -55,8 +54,8 @@ export function isLoggedIn(): boolean {
   return !!localStorage.getItem(KEYS.TOKEN);
 }
 
-export function getPhone(): string {
-  return localStorage.getItem(KEYS.PHONE) ?? '';
+export function getEmail(): string {
+  return localStorage.getItem(KEYS.EMAIL) ?? '';
 }
 
 export function getPlan(): 'free' | 'pro' {
@@ -69,4 +68,16 @@ export function getRepartidorName(): string {
 
 export function setRepartidorName(name: string): void {
   localStorage.setItem(KEYS.NAME, name);
+}
+
+/** Activa plan pro localmente (llamar solo después de verificar pago server-side). */
+export function setPro(stripeSessionId?: string): void {
+  localStorage.setItem(KEYS.PLAN, 'pro');
+  if (stripeSessionId) localStorage.setItem('mr-stripe-session', stripeSessionId);
+}
+
+/** Desactiva pro (solo admin / soporte). */
+export function setFree(): void {
+  localStorage.setItem(KEYS.PLAN, 'free');
+  localStorage.removeItem('mr-stripe-session');
 }
