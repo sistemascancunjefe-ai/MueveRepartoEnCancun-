@@ -304,7 +304,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   // ── QR Scanner ──
   let qrStream: MediaStream | null = null;
   let qrAnimFrame: number | null = null;
-  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number } = {};
+  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number; lat?: number; lng?: number } = {};
 
   // Cargar jsQR desde el bundle (instalado como dependencia npm)
   async function loadJsQR(): Promise<any> {
@@ -415,6 +415,17 @@ import MainLayout from '../layouts/MainLayout.astro';
     const text = raw.trim();
     const result: typeof scannedData = {};
 
+    // Si el texto es una URL de mapa, extraer coordenadas directamente
+    if (/^https?:\/\//i.test(text)) {
+      const mapCoords = parseCoordsFromMapUrl(text);
+      if (mapCoords) {
+        result.lat = mapCoords.lat;
+        result.lng = mapCoords.lng;
+        result.address = text;  // Guardar URL como referencia
+        return result;
+      }
+    }
+
     // Teléfono mexicano
     const phoneMatch = text.match(/(?:tel[.:]\s*)?(?:\+?52\s*)?(\d{3}[\s-]?\d{3}[\s-]?\d{4}|\d{10})/i);
     if (phoneMatch) result.clientPhone = phoneMatch[1].replace(/[\s-]/g, '');
@@ -458,6 +469,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     const rows = [
       parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${escapeHtml(parsed.address)}</div>` : '',
+      (parsed.lat != null && parsed.lng != null) ? `<div>🗺️ <strong>Coords:</strong> ${parsed.lat.toFixed(5)}, ${parsed.lng.toFixed(5)}</div>` : '',
       parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${escapeHtml(parsed.clientName)}</div>` : '',
       parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${escapeHtml(parsed.clientPhone)}</div>` : '',
       parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${escapeHtml(String(parsed.income))}</div>` : '',
@@ -989,6 +1001,15 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (currentMode === 'text' && currentCoords) {
       finalLat = currentCoords.lat;
       finalLng = currentCoords.lng;
+    } else if (currentMode === 'link') {
+      const extracted = parseCoordsFromMapUrl(address);
+      if (extracted) {
+        finalLat = extracted.lat;
+        finalLng = extracted.lng;
+      }
+    } else if (currentMode === 'qr' && scannedData.lat != null && scannedData.lng != null) {
+      finalLat = scannedData.lat;
+      finalLng = scannedData.lng;
     } else {
       const latStr = (document.getElementById('input-lat') as HTMLInputElement).value;
       const lngStr = (document.getElementById('input-lng') as HTMLInputElement).value;
