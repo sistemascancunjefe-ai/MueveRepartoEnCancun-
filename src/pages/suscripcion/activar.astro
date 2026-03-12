@@ -16,10 +16,9 @@ if (sessionId) {
     errorMsg = 'Configuración incompleta. Contacta soporte.';
   } else {
     try {
-      const creds = Buffer.from(`${secret}:`).toString('base64');
       const res = await fetch(
         `https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
-        { headers: { Authorization: `Basic ${creds}` } }
+        { headers: { Authorization: `Bearer ${secret}` } }
       );
       if (res.ok) {
         const data = await res.json() as { payment_status: string; customer_details?: { email?: string } };
@@ -58,16 +57,6 @@ if (sessionId) {
           <br/>Paradas ilimitadas y métricas completas desbloqueadas.
         </p>
         <p class="redirect-msg">Redirigiendo a tu dashboard…</p>
-
-        <script is:inline define:vars={{ sessionId }}>
-          // Activar pro en localStorage (verificación ya fue server-side)
-          try {
-            localStorage.setItem('mr-plan', 'pro');
-            if (sessionId) localStorage.setItem('mr-stripe-session', sessionId);
-          } catch (_) {}
-          // Redirigir al home después de 2.5s
-          setTimeout(() => { window.location.href = '/home'; }, 2500);
-        </script>
       </div>
     )}
 
@@ -103,6 +92,21 @@ if (sessionId) {
 
   </div>
 </MainLayout>
+
+<script>
+  import { setPro } from '../../lib/session';
+
+  // Solo activar pro si la página indica éxito (success-card presente).
+  // La verificación ya fue realizada server-side contra la API de Stripe.
+  const successCard = document.getElementById('success-card');
+  if (successCard) {
+    const sessionId = new URLSearchParams(window.location.search).get('session_id') ?? undefined;
+    try {
+      setPro(sessionId);
+    } catch (_) {}
+    setTimeout(() => { window.location.href = '/home'; }, 2500);
+  }
+</script>
 
 <style>
   .activate-page {
