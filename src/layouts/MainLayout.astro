@@ -596,6 +596,7 @@ const jsonLd = JSON.stringify({
         });
       }
 
+import { setupTooltips } from '../utils/tooltips.js';
       function runAll() {
         setupTheme();
         setupRepartidorName();
@@ -603,6 +604,7 @@ const jsonLd = JSON.stringify({
         setupFreemiumGate();
         setupOnboarding();
         setupPwaBanner();
+        setupTooltips();
       }
 
       document.addEventListener('astro:page-load', runAll);

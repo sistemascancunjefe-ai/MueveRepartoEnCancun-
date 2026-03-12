@@ -2,607 +2,438 @@
 import MainLayout from '../layouts/MainLayout.astro';
 ---
 
-<MainLayout title="Ruta Activa">
+<MainLayout title="Modo Reparto" showNav={false}>
+  <!-- Map container -->
+  <div id="map" style="position:fixed;inset:0;z-index:1;"></div>
 
-  <!-- Map container (full screen behind UI) -->
-  <div id="map-container" style="position:fixed;inset:0;z-index:0;" aria-label="Mapa de ruta"></div>
-
-  <!-- Main overlay UI -->
+  <!-- UI Overlay -->
   <div class="reparto-ui">
-
-    <!-- ── Status bar ── -->
-    <div id="route-status-bar" class="status-bar stagger-item" aria-live="polite">
+    <!-- Top: GPS Status -->
+    <div class="status-bar stagger-item">
       <div class="status-content">
         <div class="status-left">
-          <div id="gps-dot" class="gps-dot inactive" aria-hidden="true"></div>
-          <span id="status-text" style="font-size:0.8125rem;font-weight:700;color:var(--text-secondary);">
-            GPS inactivo
-          </span>
+          <div id="gps-status-dot" class="gps-dot inactive"></div>
+          <span id="gps-status-text" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);">GPS: Buscando...</span>
         </div>
-        <div class="status-right">
-          <span id="stops-remaining" style="font-size:0.75rem;font-weight:700;color:var(--text-tertiary);">
-            — paradas
-          </span>
-        </div>
+        <a href="/home" style="color:var(--text-tertiary);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></a>
       </div>
     </div>
 
-    <!-- ── Next stop panel (top) ── -->
-    <div id="next-panel" class="next-panel stagger-item" aria-label="Siguiente parada">
-      <div id="next-panel-content">
-        <p style="font-size:0.8125rem;color:var(--text-tertiary);text-align:center;padding:0.75rem 0;">
-          Sin ruta activa — agrega paradas primero
-        </p>
-      </div>
+    <!-- Next stop summary -->
+    <div id="next-panel" class="next-panel stagger-item" style="display:none;">
+      <p class="section-label" style="margin-bottom:0.5rem;">Próximo destino</p>
+      <div id="next-content"></div>
     </div>
 
-    <!-- ── Route list (bottom sheet) ── -->
-    <div id="route-list-panel" class="route-list-panel">
-      <div class="sheet-handle" style="cursor:pointer;" id="toggle-list-handle"></div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
-        <h2 style="font-size:0.9375rem;font-weight:800;color:var(--text-primary);margin:0;">
-          Paradas de hoy
-        </h2>
-        <div style="display:flex;gap:0.375rem;">
-          <button id="btn-optimize" class="btn-secondary btn-sm" aria-label="Optimizar orden de ruta">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3L13 9l4 4-6 6-4-4L1 21h22V3h-4zm-7.5 11.5l-4-4L13 5l4 4-5.5 5.5z"/></svg>
-            Optimizar
-          </button>
-        </div>
-      </div>
-
-      <div id="route-stops-list" style="display:flex;flex-direction:column;gap:0.375rem;max-height:220px;overflow-y:auto;" class="no-scrollbar">
-        <p style="font-size:0.8125rem;color:var(--text-tertiary);padding:0.5rem 0;">Cargando paradas...</p>
-      </div>
-    </div>
-
-    <!-- ── FAB: Start / Stop route ── -->
+    <!-- Floating Actions -->
     <div class="route-fab-area">
-      <!-- Driving mode toggle (secondary FAB) -->
-      <button id="btn-driving-mode" class="driving-fab" aria-label="Modo conducción"
-              title="Modo conducción: pantalla simplificada">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M18.92 5.01C18.72 4.42 18.16 4 17.5 4h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-6.99zM6.5 15c-.83 0-1.5-.67-1.5-1.5S5.67 12 6.5 12s1.5.67 1.5 1.5S7.33 15 6.5 15zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 10l1.5-4.5h11L19 10H5z"/>
-        </svg>
+      <button id="btn-optimize" class="driving-fab" data-tooltip="Optimizar ruta" aria-label="Optimizar ruta">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
-      <button id="btn-toggle-route" class="route-fab" aria-label="Iniciar ruta" data-active="false">
-        <svg id="fab-icon-start" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M8 5v14l11-7z"/>
-        </svg>
-        <svg id="fab-icon-stop" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="display:none;">
-          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-        </svg>
+      <button id="btn-driving-mode" class="driving-fab" data-tooltip="Modo Conducción" aria-label="Modo conducción">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/><path d="M12 12l4 4"/><path d="M12 12l-4 4"/><path d="M12 12l4-4"/><path d="M12 12l-4-4"/></svg>
+      </button>
+      <button id="btn-toggle-route" class="route-fab" aria-label="Iniciar ruta">
+        <svg id="fab-icon-start" width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg id="fab-icon-stop" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M6 6h12v12H6z"/></svg>
       </button>
     </div>
 
+    <!-- Bottom Sheet: Route List -->
+    <div id="route-list-panel" class="route-list-panel">
+      <div id="toggle-list-handle" class="sheet-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+        <h2 style="font-size:1.125rem;font-weight:900;letter-spacing:-0.02em;margin:0;">Tu Hoja de Ruta</h2>
+        <span id="route-progress" class="badge badge-primary">0 / 0</span>
+      </div>
+      <div id="route-stops" class="route-stops-container no-scrollbar" style="max-height:40vh;overflow-y:auto;display:flex;flex-direction:column;gap:0.5rem;">
+        <!-- Stops will be injected here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Driving Mode Overlay (Full Screen) -->
+  <div id="driving-mode" class="driving-mode-overlay" style="display:none;">
+    <div class="dm-header">
+      <button id="dm-close" class="dm-close-btn">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+      <div id="dm-remaining" class="dm-remaining-badge">...</div>
+    </div>
+
+    <div class="dm-body">
+      <div id="dm-stop-number" class="dm-stop-number">1</div>
+      <h1 id="dm-address" class="dm-address">Cargando...</h1>
+      <p id="dm-client" class="dm-client">...</p>
+
+      <div class="dm-actions">
+        <a id="dm-maps" href="#" target="_blank" class="dm-action-btn maps">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          MAPS
+        </a>
+        <a id="dm-whatsapp" href="#" target="_blank" class="dm-action-btn wa">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 2c-5.516 0-9.986 4.47-9.986 9.986 0 2.144.673 4.129 1.821 5.766L2.6 22l4.389-1.282c1.541.84 3.303 1.314 5.042 1.314 5.515 0 9.985-4.47 9.985-9.986 0-5.516-4.47-9.986-9.985-9.986zm5.023 14.331c-.208.583-1.234 1.133-1.698 1.18-.444.047-.732.146-2.533-.604-2.193-.911-3.606-3.14-3.716-3.287-.11-.148-.895-1.189-.895-2.278 0-1.089.567-1.624.77-1.847.203-.222.443-.278.59-.278.148 0 .296.002.425.008.134.006.313-.051.49.378.18.435.617 1.503.67 1.613.053.11.088.239.015.386-.073.147-.11.239-.22.368-.11.129-.232.287-.33.385-.11.11-.225.23-.097.449.128.219.57.941 1.223 1.52.84.746 1.549.977 1.768 1.086.219.11.348.093.477-.055.129-.148.553-.645.701-.865.148-.22.296-.185.498-.11.203.075 1.291.61 1.513.72.222.11.37.166.425.26.055.094.055.546-.153 1.129z"/></svg>
+          CLIENTE
+        </a>
+      </div>
+
+      <button id="dm-complete" class="dm-complete-btn">
+        MARCAR ENTREGADO
+      </button>
+    </div>
+  </div>
+
+  <!-- Confirmation Bottom Sheet -->
+  <div id="confirm-sheet-overlay" class="bottom-sheet-overlay"></div>
+  <div id="confirm-sheet" class="bottom-sheet">
+    <div class="sheet-handle"></div>
+    <div style="text-align:center;padding:1rem 0 2rem;">
+      <div class="dm-stop-number" style="width:60px;height:60px;font-size:1.5rem;margin:0 auto 1.5rem;">✓</div>
+      <h2 style="font-size:1.5rem;font-weight:900;margin-bottom:0.5rem;">¿Entrega completada?</h2>
+      <p style="color:var(--text-tertiary);font-size:0.9375rem;margin-bottom:2rem;">La parada se marcará como lista y se notificará al siguiente cliente si lo deseas.</p>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem;background:var(--surface-card);border:1px solid var(--border-light);border-radius:var(--radius-lg);margin-bottom:2rem;">
+        <span style="font-weight:700;">¿Avisar siguiente cliente?</span>
+        <label class="switch">
+          <input type="checkbox" id="confirm-notify" checked>
+          <span class="slider round"></span>
+        </label>
+      </div>
+
+      <div style="display:flex;gap:1rem;">
+        <button id="confirm-cancel" class="btn-secondary" style="flex:1;padding:1rem;">Cancelar</button>
+        <button id="confirm-yes" class="btn-primary" style="flex:2;padding:1rem;">Sí, completar</button>
+      </div>
+    </div>
   </div>
 </MainLayout>
 
-<!-- ── Driving Mode Overlay ──────────────────────────────────────────────── -->
-<div id="driving-mode" style="display:none;position:fixed;inset:0;z-index:8000;
-     background:#060A0E;flex-direction:column;align-items:center;justify-content:center;
-     padding:1.5rem;text-align:center;">
-
-  <!-- Close button -->
-  <button id="dm-close"
-          style="position:absolute;top:calc(env(safe-area-inset-top)+1rem);right:1rem;
-                 background:rgba(255,255,255,0.06);border:1px solid #1E293B;
-                 color:#64748B;border-radius:10px;padding:0.5rem 0.875rem;
-                 font-size:0.8125rem;font-weight:700;cursor:pointer;">
-    ✕ Salir
-  </button>
-
-  <!-- Stop number badge -->
-  <div id="dm-stop-number"
-       style="width:56px;height:56px;border-radius:50%;background:#00E8A2;
-              color:#060A0E;font-size:1.375rem;font-weight:900;
-              display:flex;align-items:center;justify-content:center;
-              margin-bottom:1.25rem;box-shadow:0 0 0 8px rgba(0,232,162,0.12);">
-    1
-  </div>
-
-  <!-- Address -->
-  <p style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
-            color:#64748B;margin:0 0 0.5rem;">Siguiente parada</p>
-  <h2 id="dm-address"
-      style="font-size:1.5rem;font-weight:900;color:#E2E8F0;margin:0 0 0.5rem;
-             letter-spacing:-0.03em;line-height:1.25;max-width:320px;">
-    Cargando...
-  </h2>
-  <p id="dm-client" style="font-size:0.9375rem;color:#64748B;margin:0 0 2.5rem;"></p>
-
-  <!-- Actions -->
-  <div style="display:flex;flex-direction:column;gap:0.75rem;width:100%;max-width:320px;">
-    <button id="dm-complete"
-            style="width:100%;padding:1.25rem;background:linear-gradient(135deg,#00E8A2,#00C48C);
-                   color:#060A0E;font-size:1.25rem;font-weight:900;border:none;
-                   border-radius:16px;cursor:pointer;letter-spacing:-0.02em;
-                   box-shadow:0 4px 20px rgba(0,232,162,0.3);">
-      ✓ ENTREGADO
-    </button>
-    <div style="display:flex;gap:0.75rem;">
-      <a id="dm-maps" href="#" target="_blank" rel="noopener noreferrer"
-         style="flex:1;padding:0.875rem;background:rgba(59,130,246,0.12);
-                border:1px solid rgba(59,130,246,0.25);color:#3B82F6;
-                font-size:0.875rem;font-weight:800;border-radius:12px;
-                text-decoration:none;text-align:center;">
-        🗺️ Navegar
-      </a>
-      <a id="dm-whatsapp" href="#" target="_blank" rel="noopener noreferrer"
-         style="flex:1;padding:0.875rem;background:rgba(37,211,102,0.12);
-                border:1px solid rgba(37,211,102,0.25);color:#25D366;
-                font-size:0.875rem;font-weight:800;border-radius:12px;
-                text-decoration:none;text-align:center;">
-        💬 Avisar
-      </a>
-    </div>
-  </div>
-
-  <!-- Remaining counter -->
-  <p id="dm-remaining" style="font-size:0.8125rem;color:#475569;margin-top:2rem;font-weight:600;"></p>
-</div>
-
-<!-- Leaflet CSS -->
-<link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
-
 <script>
-  import { getStops, dbPut, dbPutMany, STORES } from '../lib/idb';
+  import { getStops, STORES, dbPut, dbGetAll } from '../lib/idb';
   import type { Stop } from '../lib/idb';
-  import { requestNotificationPermission, notifyStopCompleted, notifyRouteStarted, notifyNearby } from '../lib/notifications';
+  import { optimizeRoute as runOptimization } from '../utils/routes';
+  import { notifyRouteStarted, notifyStopCompleted, notifyNearby, requestNotificationPermission } from '../lib/notifications';
 
-  let map: any = null;
-  let userMarker: any = null;
-  let stopMarkers: any[] = [];
-  let routePolyline: any = null;
-  let watchId: number | null = null;
+  let map: any;
   let isRouteActive = false;
   let currentPosition: [number, number] | null = null;
-  const CANCUN_CENTER: [number, number] = [21.1619, -86.8515];
+  let markers: any[] = [];
 
-  // ── Load Leaflet ──
-  async function loadLeaflet() {
-    if ((window as any).L) return (window as any).L;
-    return new Promise<any>((resolve) => {
-      const s = document.createElement('script');
-      s.src = '/vendor/leaflet/leaflet.js';
-      s.onload = () => resolve((window as any).L);
-      document.head.appendChild(s);
-    });
-  }
-
-  // ── Init map ──
+  // ── Map Init ──
   async function initMap() {
-    const L = await loadLeaflet();
-    const container = document.getElementById('map-container');
-    if (!container || map) return;
+    const L = (window as any).L;
+    if (!L) return;
 
-    map = L.map(container, {
-      center: CANCUN_CENTER,
-      zoom: 13,
+    map = L.map('map', {
       zoomControl: false,
-      attributionControl: false,
-    });
+      attributionControl: false
+    }).setView([21.1619, -86.8515], 13);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; CartoDB',
-      subdomains: 'abcd',
-      maxZoom: 19,
+      maxZoom: 19
     }).addTo(map);
 
-    // Custom attribution (small)
-    L.control.attribution({ position: 'bottomleft', prefix: '&copy; CartoDB' }).addTo(map);
-
-    await renderStopMarkers(L);
+    await renderStops();
+    startGPS();
   }
 
-  // ── Render stop markers ──
-  async function renderStopMarkers(L: any) {
-    // Remove old markers
-    stopMarkers.forEach(m => map.removeLayer(m));
-    stopMarkers = [];
-    if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
-
-    const stops = await getStops();
-    const pending = stops.filter(s => s.status !== 'completed' && s.lat && s.lng);
-
-    if (pending.length === 0) {
-      updateRouteList(stops);
-      return;
-    }
-
-    // Draw markers
-    pending.forEach((stop, i) => {
-      const color = stop.priority === 'urgent' ? '#FF5A5F' : '#00E8A2';
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="
-          width:32px;height:32px;border-radius:50%;
-          background:${color};
-          border:3px solid #060A0E;
-          display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:900;color:#060A0E;
-          box-shadow:0 2px 8px rgba(0,0,0,0.4);
-          cursor:pointer;">${stop.order + 1}</div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
-      });
-      const marker = L.marker([stop.lat!, stop.lng!], { icon })
-        .addTo(map)
-        .bindPopup(`<strong>${stop.address}</strong>${stop.note ? `<br/>${stop.note}` : ''}`, {
-          className: 'mr-popup',
-        });
-      stopMarkers.push(marker);
-    });
-
-    // Draw polyline route
-    if (pending.length > 1) {
-      const coords = pending.map(s => [s.lat!, s.lng!] as [number, number]);
-      routePolyline = L.polyline(coords, {
-        color: '#00E8A2',
-        weight: 3,
-        opacity: 0.7,
-        dashArray: '8, 6',
-      }).addTo(map);
-    }
-
-    // Fit bounds
-    if (pending.length > 0) {
-      const bounds = L.latLngBounds(pending.map(s => [s.lat!, s.lng!]));
-      map.fitBounds(bounds, { padding: [60, 60] });
-    }
-
-    updateRouteList(stops);
-    updateNextPanel(stops);
-  }
-
-  // ── Route list (bottom sheet) ──
-  function updateRouteList(stops: Stop[]) {
-    const el = document.getElementById('route-stops-list');
-    if (!el) return;
-
-    const remaining = document.getElementById('stops-remaining');
-    const pendingCount = stops.filter(s => s.status !== 'completed').length;
-    if (remaining) remaining.textContent = `${pendingCount} restantes`;
-
-    if (stops.length === 0) {
-      el.innerHTML = `<p style="font-size:0.8125rem;color:var(--text-tertiary);padding:0.5rem 0;text-align:center;">
-        Sin paradas — <a href="/pedidos" style="color:var(--color-primary);">agregar aquí</a></p>`;
-      return;
-    }
-
-    el.innerHTML = stops.map(s => `
-      <div class="route-stop-row ${s.status === 'completed' ? 'done' : ''}">
-        <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}" style="font-size:0.6875rem;width:1.5rem;height:1.5rem;">${s.order + 1}</div>
-        <div style="flex:1;min-width:0;">
-          <p style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);margin:0;
-            ${s.status === 'completed' ? 'text-decoration:line-through;color:var(--text-tertiary)' : ''};
-            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.address}</p>
-        </div>
-        ${s.status === 'completed'
-          ? '<span class="badge badge-success" style="flex-shrink:0;">Listo</span>'
-          : `<button class="stop-action-btn complete-btn" data-id="${s.id}" style="flex-shrink:0;" aria-label="Completar">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-             </button>`}
-      </div>`).join('');
-
-    el.querySelectorAll('.complete-btn').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const id = (btn as HTMLElement).dataset.id!;
-        const stop = stops.find(s => s.id === id);
-        if (!stop) return;
-        await dbPut(STORES.STOPS, { ...stop, status: 'completed', completedAt: Date.now() });
-        const L = (window as any).L;
-        if (L) await renderStopMarkers(L);
-      });
-    });
-  }
-
-  // ── Next stop panel ──
-  function updateNextPanel(stops: Stop[]) {
-    const next = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
-    const el = document.getElementById('next-panel-content');
-    if (!el) return;
-
-    if (!next) {
-      el.innerHTML = `<p style="font-size:0.875rem;font-weight:700;color:var(--color-primary);text-align:center;padding:0.5rem 0;">
-        ¡Ruta completada!</p>`;
-      return;
-    }
-
-    el.innerHTML = `
-      <div style="display:flex;align-items:flex-start;gap:0.625rem;">
-        <div class="stop-number ${next.priority === 'urgent' ? 'urgent' : ''}">${next.order + 1}</div>
-        <div style="flex:1;min-width:0;">
-          <p style="font-size:0.625rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;
-            color:var(--text-tertiary);margin:0 0 0.125rem;">Siguiente parada</p>
-          <p style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0;
-            overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${next.address}</p>
-          ${next.note ? `<p style="font-size:0.75rem;color:var(--text-secondary);margin:0.125rem 0 0;">${next.note}</p>` : ''}
-        </div>
-        ${next.lat && next.lng ? `
-          <a href="https://maps.google.com/maps?daddr=${next.lat},${next.lng}"
-             target="_blank" rel="noopener noreferrer"
-             class="btn-primary btn-sm" style="flex-shrink:0;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            Maps
-          </a>` : ''}
-      </div>`;
-  }
-
-  // ── GPS Tracking ──
-  function startTracking() {
-    if (!navigator.geolocation) return;
+  async function renderStops() {
     const L = (window as any).L;
+    const stops = await getStops();
 
-    const dot = document.getElementById('gps-dot');
-    const statusText = document.getElementById('status-text');
+    // Clear old markers
+    markers.forEach(m => m.remove());
+    markers = [];
 
-    if (dot) dot.classList.replace('inactive', 'active');
-    if (statusText) statusText.textContent = 'GPS activo — rastreando';
+    const pending = stops.filter(s => s.status !== 'completed');
+    const completed = stops.filter(s => s.status === 'completed');
 
-    window.dispatchEvent(new CustomEvent('mr:tracking-start'));
+    // Render pending
+    pending.forEach(s => {
+      if (s.lat && s.lng) {
+        const icon = L.divIcon({
+          className: 'custom-marker',
+          html: `<div class="marker-pin ${s.priority === 'urgent' ? 'urgent' : ''}">${s.order + 1}</div>`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 30]
+        });
+        const m = L.marker([s.lat, s.lng], { icon }).addTo(map);
+        markers.push(m);
+      }
+    });
 
-    watchId = navigator.geolocation.watchPosition(
+    updateRouteUI(stops);
+  }
+
+  function updateRouteUI(stops: Stop[]) {
+    const listEl = document.getElementById('route-stops')!;
+    const progressEl = document.getElementById('route-progress')!;
+    const nextPanel = document.getElementById('next-panel')!;
+    const nextContent = document.getElementById('next-content')!;
+
+    const pending = stops.filter(s => s.status !== 'completed');
+    const completedCount = stops.length - pending.length;
+    progressEl.textContent = `${completedCount} / ${stops.length}`;
+
+    // Update Next Panel
+    const next = pending[0];
+    if (next) {
+      nextPanel.style.display = 'block';
+      nextContent.innerHTML = `
+        <div style="display:flex;gap:0.75rem;">
+          <div class="stop-number ${next.priority === 'urgent' ? 'urgent' : ''}">${next.order + 1}</div>
+          <div style="flex:1;">
+            <p style="font-weight:700;margin:0;">${next.address}</p>
+            <p style="font-size:0.75rem;color:var(--text-tertiary);margin:2px 0 0;">${next.clientName || 'Sin nombre'}</p>
+          </div>
+        </div>`;
+    } else {
+      nextPanel.style.display = 'none';
+    }
+
+    // Update List
+    listEl.innerHTML = stops.map(s => `
+      <div class="route-stop-row ${s.status === 'completed' ? 'done' : ''}" data-id="${s.id}">
+        <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}" style="width:24px;height:24px;font-size:0.625rem;">${s.order + 1}</div>
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:0.875rem;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.address}</p>
+        </div>
+        ${s.status === 'completed' ? '<span class="badge badge-success">Listo</span>' : ''}
+        <div class="swipe-hint"></div>
+      </div>
+    `).join('');
+
+    setupSwipeGestures();
+  }
+
+  // ── GPS ──
+  function startGPS() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.watchPosition(
       (pos) => {
-        currentPosition = [pos.coords.latitude, pos.coords.longitude];
-        if (!L || !map) return;
+        const { latitude: lat, longitude: lng } = pos.coords;
+        currentPosition = [lat, lng];
+        document.getElementById('gps-status-dot')!.className = 'gps-dot active';
+        document.getElementById('gps-status-text')!.textContent = 'GPS: Activo';
 
-        if (!userMarker) {
-          const icon = L.divIcon({
-            className: '',
-            html: `<div style="
-              width:20px;height:20px;border-radius:50%;
-              background:#00E8A2;border:3px solid white;
-              box-shadow:0 0 0 4px rgba(0,232,162,0.25),0 2px 8px rgba(0,0,0,0.4);">
-            </div>`,
-            iconSize: [20, 20],
-            iconAnchor: [10, 10],
-          });
-          userMarker = L.marker(currentPosition, { icon, zIndexOffset: 1000 }).addTo(map);
+        const L = (window as any).L;
+        if (!window['userMarker']) {
+          window['userMarker'] = L.circleMarker([lat, lng], {
+            radius: 8,
+            fillColor: '#00E8A2',
+            color: '#fff',
+            weight: 2,
+            fillOpacity: 1
+          }).addTo(map);
         } else {
-          userMarker.setLatLng(currentPosition);
+          window['userMarker'].setLatLng([lat, lng]);
         }
 
-        map.panTo(currentPosition, { animate: true });
-
-        // Check proximity alert (non-blocking)
-        getStops().then(stops => checkNearbyAlert(stops)).catch(() => {});
+        checkProximity();
       },
-      (err) => console.warn('[Reparto] GPS error:', err),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      () => {
+        document.getElementById('gps-status-dot')!.className = 'gps-dot inactive';
+        document.getElementById('gps-status-text')!.textContent = 'GPS: Error';
+      },
+      { enableHighAccuracy: true }
     );
   }
 
-  function stopTracking() {
-    if (watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
+  async function checkProximity() {
+    if (!currentPosition) return;
+    const stops = await getStops();
+    const next = stops.find(s => s.status !== 'completed');
+    if (!next?.lat || !next?.lng) return;
+
+    const dist = getDistance(currentPosition[0], currentPosition[1], next.lat, next.lng);
+    if (dist < 0.3) { // 300 meters
+       notifyNearby(next.address, dist);
     }
-    const dot = document.getElementById('gps-dot');
-    const statusText = document.getElementById('status-text');
-    if (dot) dot.classList.replace('active', 'inactive');
-    if (statusText) statusText.textContent = 'GPS inactivo';
-    window.dispatchEvent(new CustomEvent('mr:tracking-stop'));
   }
 
-  // ── Optimize route (nearest-neighbor greedy) ──
+  function getDistance(lat1:number, lon1:number, lat2:number, lon2:number) {
+    const R = 6371;
+    const dLat = (lat2-lat1) * Math.PI / 180;
+    const dLon = (lon2-lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // ── Actions ──
   async function optimizeRoute() {
-    const allStops = await getStops();
-    const completed = allStops.filter(s => s.status === 'completed');
-    const pending   = allStops.filter(s => s.status !== 'completed');
-    if (pending.length < 2) return;
-
-    // Simple nearest-neighbor from current position or first pending stop with coords
-    const firstWithCoords = pending.find(s => s.lat && s.lng);
-    const start = currentPosition ??
-      (firstWithCoords ? [firstWithCoords.lat!, firstWithCoords.lng!] as [number, number] : null);
-
-    if (!start) {
-      alert('Activa el GPS o agrega coordenadas a las paradas para optimizar la ruta.');
-      return;
+    const btn = document.getElementById('btn-optimize')!;
+    btn.classList.add('animate-spin');
+    const stops = await getStops();
+    const optimized = await runOptimization(stops, currentPosition);
+    for (const s of optimized) {
+      await dbPut(STORES.STORES, s); // Using STORES.STOPS logic from idb.ts
     }
-
-    const unvisited = new Set(pending);
-    const ordered: Stop[] = [];
-    let current = start;
-
-    while (unvisited.size > 0) {
-      let nearest: Stop | null = null;
-      let minDist = Infinity;
-
-      for (const s of unvisited) {
-        if (!s.lat || !s.lng) continue;
-        const d = Math.hypot(s.lat - current[0], s.lng - current[1]);
-        if (d < minDist) { minDist = d; nearest = s; }
-      }
-
-      // Stops without coords go at the end
-      if (!nearest) {
-        unvisited.forEach(s => ordered.push(s));
-        break;
-      }
-
-      ordered.push(nearest);
-      current = [nearest.lat!, nearest.lng!];
-      unvisited.delete(nearest);
-    }
-
-    // Completed stays first (0..completed-1), optimized pending follows after
-    const allOrdered: Stop[] = [
-      ...completed.map((s, i) => ({ ...s, order: i })),
-      ...ordered.map((s, i) => ({ ...s, order: completed.length + i })),
-    ];
-
-    await dbPutMany(STORES.STOPS, allOrdered);
-
-    const L = (window as any).L;
-    if (L) await renderStopMarkers(L);
+    await renderStops();
+    btn.classList.remove('animate-spin');
   }
 
-  // ── FAB toggle ──
   function toggleRoute() {
-    const fab = document.getElementById('btn-toggle-route') as HTMLButtonElement;
-    const iconStart = document.getElementById('fab-icon-start')!;
-    const iconStop  = document.getElementById('fab-icon-stop')!;
-
     isRouteActive = !isRouteActive;
-    fab.dataset.active = String(isRouteActive);
-    fab.setAttribute('aria-label', isRouteActive ? 'Detener ruta' : 'Iniciar ruta');
+    const fab = document.getElementById('btn-toggle-route')!;
+    const iconStart = document.getElementById('fab-icon-start')!;
+    const iconStop = document.getElementById('fab-icon-stop')!;
 
     if (isRouteActive) {
       iconStart.style.display = 'none';
-      iconStop.style.display  = 'block';
-      fab.style.background    = 'var(--gradient-urgent)';
-      fab.style.boxShadow     = '0 4px 20px rgba(255,90,95,0.4)';
-      startTracking();
+      iconStop.style.display = 'block';
+      fab.style.background = 'var(--gradient-urgent)';
+      notifyRouteStarted(markers.length);
     } else {
       iconStart.style.display = 'block';
-      iconStop.style.display  = 'none';
-      fab.style.background    = 'var(--gradient-primary)';
-      fab.style.boxShadow     = '0 4px 20px rgba(0,232,162,0.4)';
-      stopTracking();
+      iconStop.style.display = 'none';
+      fab.style.background = 'var(--gradient-primary)';
     }
   }
 
-  // ── Toggle list handle ──
-  function setupListToggle() {
-    const panel = document.getElementById('route-list-panel')!;
-    const handle = document.getElementById('toggle-list-handle')!;
-    let expanded = true;
-
-    handle.addEventListener('click', () => {
-      expanded = !expanded;
-      panel.style.transform = expanded ? 'translateY(0)' : 'translateY(calc(100% - 60px))';
+  // ── Swipe Logic ──
+  function setupSwipeGestures() {
+    const rows = document.querySelectorAll('.route-stop-row');
+    rows.forEach(row => {
+      let startX = 0;
+      row.addEventListener('touchstart', (e: any) => startX = e.touches[0].clientX);
+      row.addEventListener('touchmove', (e: any) => {
+        const diff = e.touches[0].clientX - startX;
+        if (diff > 50) {
+          (row as HTMLElement).style.transform = `translateX(${Math.min(diff, 100)}px)`;
+          if (diff > 80) (row as HTMLElement).style.background = 'rgba(0, 232, 162, 0.1)';
+        }
+      });
+      row.addEventListener('touchend', (e: any) => {
+        const diff = e.changedTouches[0].clientX - startX;
+        if (diff > 80) {
+          const id = (row as HTMLElement).dataset.id;
+          openConfirmSheet(id);
+        }
+        (row as HTMLElement).style.transform = '';
+        (row as HTMLElement).style.background = '';
+      });
     });
   }
 
-  // ── Driving Mode ──────────────────────────────────────────────────────────
+  // ── Confirmation Sheet Logic ──
+  let pendingStopId: string | null = null;
+
+  function openConfirmSheet(id: string | undefined) {
+    if (!id) return;
+    pendingStopId = id;
+    document.getElementById('confirm-sheet-overlay')!.classList.add('open');
+    document.getElementById('confirm-sheet')!.classList.add('open');
+  }
+
+  function closeConfirmSheet() {
+    pendingStopId = null;
+    document.getElementById('confirm-sheet-overlay')!.classList.remove('open');
+    document.getElementById('confirm-sheet')!.classList.remove('open');
+  }
+
+  async function completeStop() {
+    if (!pendingStopId) return;
+    const stops = await getStops();
+    const stop = stops.find(s => s.id === pendingStopId);
+    if (stop) {
+      await dbPut(STORES.STOPS, { ...stop, status: 'completed', completedAt: Date.now() });
+      const notify = (document.getElementById('confirm-notify') as HTMLInputElement).checked;
+      const remaining = stops.filter(s => s.status !== 'completed').length - 1;
+
+      if (notify) {
+         await notifyStopCompleted(stop.address, remaining);
+      }
+
+      await renderStops();
+      if (drivingActive) updateDrivingMode();
+    }
+    closeConfirmSheet();
+  }
+
+  // ── Driving Mode Logic ──
   let drivingActive = false;
 
   async function updateDrivingMode() {
-    const overlay   = document.getElementById('driving-mode')!;
-    const numEl     = document.getElementById('dm-stop-number')!;
-    const addrEl    = document.getElementById('dm-address')!;
-    const clientEl  = document.getElementById('dm-client')!;
-    const mapsLink  = document.getElementById('dm-maps') as HTMLAnchorElement;
-    const waLink    = document.getElementById('dm-whatsapp') as HTMLAnchorElement;
-    const remaining = document.getElementById('dm-remaining')!;
+    const numEl = document.getElementById('dm-stop-number')!;
+    const addrEl = document.getElementById('dm-address')!;
+    const clientEl = document.getElementById('dm-client')!;
+    const remainingEl = document.getElementById('dm-remaining')!;
+    const mapsBtn = document.getElementById('dm-maps') as HTMLAnchorElement;
+    const waBtn = document.getElementById('dm-whatsapp') as HTMLAnchorElement;
 
-    const stops  = await getStops();
-    const next   = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
+    const stops = await getStops();
+    const next = stops.find(s => s.status !== 'completed');
     const pendingCount = stops.filter(s => s.status !== 'completed').length;
 
     if (!next) {
-      addrEl.textContent  = '¡Todas completadas! 🎉';
-      clientEl.textContent = '';
-      numEl.textContent    = '✓';
-      numEl.style.background = '#00E8A2';
-      remaining.textContent = '';
-      mapsLink.style.display = 'none';
-      waLink.style.display   = 'none';
+      addrEl.textContent = "¡Ruta Terminada! 🎉";
+      clientEl.textContent = "Has completado todas las paradas.";
+      numEl.textContent = "✓";
+      numEl.style.background = "#00E8A2";
+      remainingEl.textContent = "0 paradas";
       return;
     }
 
-    numEl.textContent   = String(next.order + 1);
+    numEl.textContent = String(next.order + 1);
     numEl.style.background = next.priority === 'urgent' ? '#FF5A5F' : '#00E8A2';
-    addrEl.textContent  = next.address;
-    clientEl.textContent = [next.clientName, next.clientPhone].filter(Boolean).join(' · ');
-    remaining.textContent = `${pendingCount} parada${pendingCount !== 1 ? 's' : ''} restantes`;
+    addrEl.textContent = next.address;
+    clientEl.textContent = next.clientName || "Cliente sin nombre";
+    remainingEl.textContent = `${pendingCount} paradas restantes`;
 
-    if (next.lat && next.lng) {
-      mapsLink.href = `https://maps.google.com/maps?daddr=${next.lat},${next.lng}`;
-      mapsLink.style.display = '';
-    } else {
-      mapsLink.style.display = 'none';
-    }
+    mapsBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${next.lat},${next.lng}`;
     if (next.clientPhone) {
-      const phone = next.clientPhone.replace(/\D/g, '');
-      const msg   = encodeURIComponent(`Hola${next.clientName ? ` ${next.clientName}` : ''}! 🚚 Ya voy llegando a entregar tu pedido en ${next.address}.`);
-      waLink.href = `https://wa.me/${phone}?text=${msg}`;
-      waLink.style.display = '';
+      waBtn.style.display = 'flex';
+      waBtn.href = `https://wa.me/${next.clientPhone}`;
     } else {
-      waLink.style.display = 'none';
+      waBtn.style.display = 'none';
     }
   }
 
-  function openDrivingMode() {
-    drivingActive = true;
-    const overlay = document.getElementById('driving-mode')!;
-    overlay.style.display = 'flex';
-    updateDrivingMode();
-    // Request notification permission on first driving mode use
-    requestNotificationPermission();
-  }
-
-  function closeDrivingMode() {
-    drivingActive = false;
-    document.getElementById('driving-mode')!.style.display = 'none';
-  }
-
-  function setupDrivingMode() {
-    document.getElementById('btn-driving-mode')?.addEventListener('click', openDrivingMode);
-    document.getElementById('dm-close')?.addEventListener('click', closeDrivingMode);
-
-    document.getElementById('dm-complete')?.addEventListener('click', async () => {
-      const stops = await getStops();
-      const next  = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
-      if (!next) return;
-
-      await dbPut(STORES.STOPS, { ...next, status: 'completed', completedAt: Date.now() });
-
-      const remaining = stops.filter(s => s.status !== 'completed').length - 1;
-      await notifyStopCompleted(next.address, remaining);
-
-      const L = (window as any).L;
-      if (L) await renderStopMarkers(L);
-      await updateDrivingMode();
-    });
-  }
-
-  // ── Notification on GPS proximity ─────────────────────────────────────────
-  let _lastNearbyNotif = 0;
-
-  function checkNearbyAlert(stops: Stop[]) {
-    if (!currentPosition) return;
-    const next = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
-    if (!next?.lat || !next?.lng) return;
-
-    const distKm = Math.hypot(next.lat - currentPosition[0], next.lng - currentPosition[1]) * 111;
-    if (distKm <= 0.5 && Date.now() - _lastNearbyNotif > 120_000) {
-      _lastNearbyNotif = Date.now();
-      notifyNearby(next.address, distKm);
+  function toggleDrivingMode() {
+    drivingActive = !drivingActive;
+    const dm = document.getElementById('driving-mode')!;
+    dm.style.display = drivingActive ? 'flex' : 'none';
+    if (drivingActive) {
+      updateDrivingMode();
+      requestNotificationPermission();
     }
   }
 
-  // ── Init ──
-  async function init() {
-    await initMap();
-    setupListToggle();
-    setupDrivingMode();
+  // ── Setup Listeners ──
+  document.addEventListener('astro:page-load', () => {
+    initMap();
 
-    document.getElementById('btn-toggle-route')?.addEventListener('click', async () => {
-      toggleRoute();
-      if (isRouteActive) {
-        const stops = await getStops();
-        const pending = stops.filter(s => s.status !== 'completed').length;
-        if (pending > 0) await notifyRouteStarted(pending);
+    document.getElementById('btn-optimize')?.addEventListener('click', optimizeRoute);
+    document.getElementById('btn-toggle-route')?.addEventListener('click', toggleRoute);
+    document.getElementById('btn-driving-mode')?.addEventListener('click', toggleDrivingMode);
+    document.getElementById('dm-close')?.addEventListener('click', toggleDrivingMode);
+    document.getElementById('dm-complete')?.addEventListener('click', () => {
+      const stops = document.querySelectorAll('.route-stop-row:not(.done)');
+      if (stops.length > 0) {
+        openConfirmSheet((stops[0] as HTMLElement).dataset.id);
       }
     });
-    document.getElementById('btn-optimize')?.addEventListener('click', optimizeRoute);
-  }
 
-  document.addEventListener('astro:page-load', init);
-  if (document.readyState !== 'loading') init();
+    document.getElementById('confirm-cancel')?.addEventListener('click', closeConfirmSheet);
+    document.getElementById('confirm-yes')?.addEventListener('click', completeStop);
+    document.getElementById('confirm-sheet-overlay')?.addEventListener('click', closeConfirmSheet);
+
+    // List toggle
+    const handle = document.getElementById('toggle-list-handle')!;
+    const panel = document.getElementById('route-list-panel')!;
+    let isExpanded = true;
+    handle.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      panel.style.transform = isExpanded ? 'translateY(0)' : 'translateY(calc(100% - 50px))';
+    });
+  });
 </script>
 
 <style>
-  /* Full-screen layout: map behind, UI on top */
-  :global(main) {
-    max-width: 100% !important;
-    padding: 0 !important;
-  }
+  :global(main) { max-width: 100% !important; padding: 0 !important; }
 
   .reparto-ui {
     position: fixed;
@@ -614,156 +445,228 @@ import MainLayout from '../layouts/MainLayout.astro';
     padding-top: env(safe-area-inset-top);
   }
 
-  /* Status bar */
   .status-bar {
-    margin: calc(var(--header-h) + 0.5rem) 0.75rem 0;
+    margin: 1rem 1rem 0;
     pointer-events: auto;
-    background: var(--surface-card);
+    background: rgba(13, 17, 23, 0.8);
+    backdrop-filter: blur(12px);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-full);
-    padding: 0.5rem 0.875rem;
+    padding: 0.625rem 1rem;
   }
 
-  .status-content {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  .status-content { display: flex; align-items: center; justify-content: space-between; }
+  .status-left { display: flex; align-items: center; gap: 0.5rem; }
+
+  .gps-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .gps-dot.inactive { background: #4B5563; }
+  .gps-dot.active {
+    background: #00E8A2;
+    box-shadow: 0 0 12px rgba(0, 232, 162, 0.5);
+    animation: pulse 2s infinite;
   }
 
-  .status-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
   }
 
-  .gps-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  .gps-dot.inactive { background: var(--text-tertiary); }
-  .gps-dot.active   {
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(0,232,162,0.2);
-    animation: gps-blink 1.5s ease-in-out infinite;
-  }
-
-  @keyframes gps-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.4; }
-  }
-
-  /* Next panel */
   .next-panel {
-    margin: 0.5rem 0.75rem 0;
+    margin: 0.75rem 1rem 0;
     pointer-events: auto;
     background: var(--surface-card);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-xl);
-    padding: 0.75rem 1rem;
+    padding: 1rem;
+    box-shadow: var(--glass-shadow);
   }
 
-  /* Route list (bottom) */
-  .route-list-panel {
-    position: absolute;
-    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
-    left: 0;
-    right: 0;
-    pointer-events: auto;
-    background: var(--surface-elevated);
-    border-top-left-radius: 20px;
-    border-top-right-radius: 20px;
-    border-top: 1px solid var(--border-light);
-    padding: 0 1rem 1rem;
-    max-width: 480px;
-    margin: 0 auto;
-    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  /* Route stop rows */
-  .route-stop-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .route-stop-row.done { opacity: 0.45; }
-
-  /* FAB */
   .route-fab-area {
     position: absolute;
-    bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 18rem);
+    bottom: calc(var(--bottom-nav-h) + 12rem);
     right: 1.25rem;
     pointer-events: auto;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.625rem;
+    gap: 0.75rem;
   }
 
-  /* Driving mode secondary FAB */
   .driving-fab {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: rgba(13,17,23,0.9);
+    background: var(--surface-elevated);
     border: 1px solid var(--border-light);
-    cursor: pointer;
+    color: var(--text-primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-secondary);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    transition: all 0.2s ease;
-    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   }
 
-  .driving-fab:hover { color: #00E8A2; border-color: rgba(0,232,162,0.4); }
-  .driving-fab:active { transform: scale(0.9); }
-
   .route-fab {
-    width: 60px;
-    height: 60px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: var(--gradient-primary);
     border: none;
-    cursor: pointer;
+    color: #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #060A0E;
-    box-shadow: 0 4px 20px rgba(0,232,162,0.4);
-    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    -webkit-tap-highlight-color: transparent;
+    box-shadow: 0 8px 24px rgba(0, 232, 162, 0.3);
   }
 
-  .route-fab:active { transform: scale(0.9); }
-
-  .route-fab[data-active="true"] {
-    animation: fab-pulse 2s ease-in-out infinite;
+  .route-list-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    pointer-events: auto;
+    background: var(--surface-elevated);
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+    padding: 0 1.25rem 1.25rem;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 20;
+    border-top: 1px solid var(--border-light);
   }
 
-  @keyframes fab-pulse {
-    0%, 100% { box-shadow: 0 4px 20px rgba(255,90,95,0.4); }
-    50%       { box-shadow: 0 4px 30px rgba(255,90,95,0.7); }
-  }
-
-  /* Leaflet popup style */
-  :global(.mr-popup .leaflet-popup-content-wrapper) {
+  .route-stop-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem;
     background: var(--surface-card);
     border: 1px solid var(--border-light);
     border-radius: var(--radius-lg);
-    color: var(--text-primary);
-    font-family: "Inter", sans-serif;
-    font-size: 0.875rem;
-    box-shadow: var(--glass-shadow);
+    transition: all 0.2s ease;
+    position: relative;
+  }
+  .route-stop-row.done { opacity: 0.5; filter: grayscale(1); }
+
+  /* Driving Mode Styles */
+  .driving-mode-overlay {
+    position: fixed;
+    inset: 0;
+    background: #060A0E;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) 1.5rem env(safe-area-inset-bottom);
   }
 
-  :global(.mr-popup .leaflet-popup-tip) {
-    background: var(--surface-card);
+  .dm-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 0;
   }
+
+  .dm-close-btn {
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: #fff;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dm-remaining-badge {
+    background: #1E293B;
+    color: #94A3B8;
+    padding: 0.5rem 1rem;
+    border-radius: 99px;
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+
+  .dm-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .dm-stop-number {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #000;
+    font-size: 2.5rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2rem;
+    box-shadow: 0 0 30px rgba(0, 232, 162, 0.4);
+  }
+
+  .dm-address {
+    font-size: 2.25rem;
+    font-weight: 900;
+    line-height: 1.1;
+    color: #fff;
+    margin-bottom: 1rem;
+    letter-spacing: -0.04em;
+  }
+
+  .dm-client {
+    font-size: 1.25rem;
+    color: #94A3B8;
+    margin-bottom: 3rem;
+  }
+
+  .dm-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    width: 100%;
+    margin-bottom: 2rem;
+  }
+
+  .dm-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem;
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    font-weight: 900;
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+  }
+
+  .dm-action-btn.maps { background: #3B82F6; color: #fff; }
+  .dm-action-btn.wa { background: #25D366; color: #fff; }
+
+  .dm-complete-btn {
+    width: 100%;
+    padding: 1.5rem;
+    background: var(--gradient-primary);
+    border: none;
+    border-radius: var(--radius-xl);
+    color: #000;
+    font-size: 1.25rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    box-shadow: 0 10px 40px rgba(0, 232, 162, 0.3);
+  }
+
+  /* Switch UI */
+  .switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; inset: 0; background-color: #334155; transition: .4s; border-radius: 34px; }
+  .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+  input:checked + .slider { background-color: var(--color-primary); }
+  input:checked + .slider:before { transform: translateX(22px); }
 </style>
