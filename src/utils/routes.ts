@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { Stop } from '../lib/idb';
 
 // Define Route Interface matching the JSON structure
 export interface Route {
@@ -87,4 +88,41 @@ export async function getAllRoutes(): Promise<Route[]> {
   }
 
   return allRoutes;
+}
+
+export async function optimizeRoute(stops: Stop[], currentPos: [number, number] | null) {
+  if (stops.length <= 1) return stops;
+
+  const pending = stops.filter(s => s.status !== 'completed');
+  const completed = stops.filter(s => s.status === 'completed');
+
+  if (pending.length <= 1) return stops;
+
+  const result = [...completed];
+  const unvisited = [...pending];
+  let currentLat = currentPos ? currentPos[0] : (unvisited[0].lat || 0);
+  let currentLng = currentPos ? currentPos[1] : (unvisited[0].lng || 0);
+
+  while (unvisited.length > 0) {
+    let nearestIdx = 0;
+    let minDist = Infinity;
+
+    for (let i = 0; i < unvisited.length; i++) {
+      const s = unvisited[i];
+      if (s.lat === undefined || s.lng === undefined) continue;
+      const d = Math.hypot(s.lat - currentLat, s.lng - currentLng);
+      if (d < minDist) {
+        minDist = d;
+        nearestIdx = i;
+      }
+    }
+
+    const next = unvisited.splice(nearestIdx, 1)[0];
+    next.order = result.length;
+    result.push(next);
+    currentLat = next.lat || 0;
+    currentLng = next.lng || 0;
+  }
+
+  return result;
 }
