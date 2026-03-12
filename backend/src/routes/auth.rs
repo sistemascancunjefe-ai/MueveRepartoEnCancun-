@@ -26,7 +26,7 @@ pub async fn send_magic_link(
     }
 
     // Rate limit: máx 3 solicitudes por email por hora
-    let recent: i64 = sqlx::query_scalar!(
+    let recent = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM magic_tokens \
          WHERE email = $1 AND created_at > NOW() - INTERVAL '1 hour'",
         email
@@ -148,9 +148,14 @@ pub async fn verify_magic_link(
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    // Marcar token como usado (idempotente si se llama dos veces)
+    // Usar una transacción para atomicidad: marcar token como usado y hacer upsert
+    // del usuario en un solo bloque. Si el upsert falla, el token no queda marcado
+    // como usado y el usuario puede reintentar con el mismo enlace.
+    let mut tx = state.pool.begin().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    // Marcar token como usado dentro de la transacción
     sqlx::query!("UPDATE magic_tokens SET used = TRUE WHERE id = $1", record.id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
@@ -161,9 +166,11 @@ pub async fn verify_magic_link(
          RETURNING id, COALESCE(plan, 'free') AS plan",
         record.email
     )
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    tx.commit().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let plan = user.plan.unwrap_or_else(|| "free".to_string());
     let jwt = create_token(user.id, &record.email, &plan, &state.jwt_secret)

@@ -2,8 +2,16 @@
 import MainLayout from '../layouts/MainLayout.astro';
 const proPriceMxn        = import.meta.env.PUBLIC_PRO_PRICE_MXN ?? '99';
 const freeLimit          = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
-const stripePubKey       = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY ?? 'pk_live_51T6oKE2dM2f4HRxoh2mpjFg4MHpHXxqc65ulAos4p22xPpD3v55ejGpiGx1Y8vdK5doYMTPGvTPi6RzsqdVv2xvE000caSvFag';
-const stripeBuyButtonId  = import.meta.env.PUBLIC_STRIPE_BUY_BUTTON_ID ?? 'buy_btn_1T9Y4E2dM2f4HRxoylh2M7Z4';
+
+const stripePubKey = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY;
+if (!stripePubKey) {
+  throw new Error('Stripe publishable key is not configured. Please set PUBLIC_STRIPE_PUBLISHABLE_KEY.');
+}
+
+const stripeBuyButtonId = import.meta.env.PUBLIC_STRIPE_BUY_BUTTON_ID;
+if (!stripeBuyButtonId) {
+  throw new Error('Stripe Buy Button ID is not configured. Please set PUBLIC_STRIPE_BUY_BUTTON_ID.');
+}
 ---
 
 <MainLayout title="Mi suscripción">
