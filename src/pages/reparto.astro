@@ -59,6 +59,13 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     <!-- ── FAB: Start / Stop route ── -->
     <div class="route-fab-area">
+      <!-- Driving mode toggle (secondary FAB) -->
+      <button id="btn-driving-mode" class="driving-fab" aria-label="Modo conducción"
+              title="Modo conducción: pantalla simplificada">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M18.92 5.01C18.72 4.42 18.16 4 17.5 4h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-6.99zM6.5 15c-.83 0-1.5-.67-1.5-1.5S5.67 12 6.5 12s1.5.67 1.5 1.5S7.33 15 6.5 15zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 10l1.5-4.5h11L19 10H5z"/>
+        </svg>
+      </button>
       <button id="btn-toggle-route" class="route-fab" aria-label="Iniciar ruta" data-active="false">
         <svg id="fab-icon-start" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M8 5v14l11-7z"/>
@@ -72,12 +79,77 @@ import MainLayout from '../layouts/MainLayout.astro';
   </div>
 </MainLayout>
 
+<!-- ── Driving Mode Overlay ──────────────────────────────────────────────── -->
+<div id="driving-mode" style="display:none;position:fixed;inset:0;z-index:8000;
+     background:#060A0E;flex-direction:column;align-items:center;justify-content:center;
+     padding:1.5rem;text-align:center;">
+
+  <!-- Close button -->
+  <button id="dm-close"
+          style="position:absolute;top:calc(env(safe-area-inset-top)+1rem);right:1rem;
+                 background:rgba(255,255,255,0.06);border:1px solid #1E293B;
+                 color:#64748B;border-radius:10px;padding:0.5rem 0.875rem;
+                 font-size:0.8125rem;font-weight:700;cursor:pointer;">
+    ✕ Salir
+  </button>
+
+  <!-- Stop number badge -->
+  <div id="dm-stop-number"
+       style="width:56px;height:56px;border-radius:50%;background:#00E8A2;
+              color:#060A0E;font-size:1.375rem;font-weight:900;
+              display:flex;align-items:center;justify-content:center;
+              margin-bottom:1.25rem;box-shadow:0 0 0 8px rgba(0,232,162,0.12);">
+    1
+  </div>
+
+  <!-- Address -->
+  <p style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
+            color:#64748B;margin:0 0 0.5rem;">Siguiente parada</p>
+  <h2 id="dm-address"
+      style="font-size:1.5rem;font-weight:900;color:#E2E8F0;margin:0 0 0.5rem;
+             letter-spacing:-0.03em;line-height:1.25;max-width:320px;">
+    Cargando...
+  </h2>
+  <p id="dm-client" style="font-size:0.9375rem;color:#64748B;margin:0 0 2.5rem;"></p>
+
+  <!-- Actions -->
+  <div style="display:flex;flex-direction:column;gap:0.75rem;width:100%;max-width:320px;">
+    <button id="dm-complete"
+            style="width:100%;padding:1.25rem;background:linear-gradient(135deg,#00E8A2,#00C48C);
+                   color:#060A0E;font-size:1.25rem;font-weight:900;border:none;
+                   border-radius:16px;cursor:pointer;letter-spacing:-0.02em;
+                   box-shadow:0 4px 20px rgba(0,232,162,0.3);">
+      ✓ ENTREGADO
+    </button>
+    <div style="display:flex;gap:0.75rem;">
+      <a id="dm-maps" href="#" target="_blank" rel="noopener noreferrer"
+         style="flex:1;padding:0.875rem;background:rgba(59,130,246,0.12);
+                border:1px solid rgba(59,130,246,0.25);color:#3B82F6;
+                font-size:0.875rem;font-weight:800;border-radius:12px;
+                text-decoration:none;text-align:center;">
+        🗺️ Navegar
+      </a>
+      <a id="dm-whatsapp" href="#" target="_blank" rel="noopener noreferrer"
+         style="flex:1;padding:0.875rem;background:rgba(37,211,102,0.12);
+                border:1px solid rgba(37,211,102,0.25);color:#25D366;
+                font-size:0.875rem;font-weight:800;border-radius:12px;
+                text-decoration:none;text-align:center;">
+        💬 Avisar
+      </a>
+    </div>
+  </div>
+
+  <!-- Remaining counter -->
+  <p id="dm-remaining" style="font-size:0.8125rem;color:#475569;margin-top:2rem;font-weight:600;"></p>
+</div>
+
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
 
 <script>
   import { getStops, dbPut, dbPutMany, STORES } from '../lib/idb';
   import type { Stop } from '../lib/idb';
+  import { requestNotificationPermission, notifyStopCompleted, notifyRouteStarted, notifyNearby } from '../lib/notifications';
 
   let map: any = null;
   let userMarker: any = null;
@@ -294,6 +366,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         }
 
         map.panTo(currentPosition, { animate: true });
+
+        // Check proximity alert (non-blocking)
+        getStops().then(stops => checkNearbyAlert(stops)).catch(() => {});
       },
       (err) => console.warn('[Reparto] GPS error:', err),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
@@ -403,12 +478,118 @@ import MainLayout from '../layouts/MainLayout.astro';
     });
   }
 
+  // ── Driving Mode ──────────────────────────────────────────────────────────
+  let drivingActive = false;
+
+  async function updateDrivingMode() {
+    const overlay   = document.getElementById('driving-mode')!;
+    const numEl     = document.getElementById('dm-stop-number')!;
+    const addrEl    = document.getElementById('dm-address')!;
+    const clientEl  = document.getElementById('dm-client')!;
+    const mapsLink  = document.getElementById('dm-maps') as HTMLAnchorElement;
+    const waLink    = document.getElementById('dm-whatsapp') as HTMLAnchorElement;
+    const remaining = document.getElementById('dm-remaining')!;
+
+    const stops  = await getStops();
+    const next   = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
+    const pendingCount = stops.filter(s => s.status !== 'completed').length;
+
+    if (!next) {
+      addrEl.textContent  = '¡Todas completadas! 🎉';
+      clientEl.textContent = '';
+      numEl.textContent    = '✓';
+      numEl.style.background = '#00E8A2';
+      remaining.textContent = '';
+      mapsLink.style.display = 'none';
+      waLink.style.display   = 'none';
+      return;
+    }
+
+    numEl.textContent   = String(next.order + 1);
+    numEl.style.background = next.priority === 'urgent' ? '#FF5A5F' : '#00E8A2';
+    addrEl.textContent  = next.address;
+    clientEl.textContent = [next.clientName, next.clientPhone].filter(Boolean).join(' · ');
+    remaining.textContent = `${pendingCount} parada${pendingCount !== 1 ? 's' : ''} restantes`;
+
+    if (next.lat && next.lng) {
+      mapsLink.href = `https://maps.google.com/maps?daddr=${next.lat},${next.lng}`;
+      mapsLink.style.display = '';
+    } else {
+      mapsLink.style.display = 'none';
+    }
+    if (next.clientPhone) {
+      const phone = next.clientPhone.replace(/\D/g, '');
+      const msg   = encodeURIComponent(`Hola${next.clientName ? ` ${next.clientName}` : ''}! 🚚 Ya voy llegando a entregar tu pedido en ${next.address}.`);
+      waLink.href = `https://wa.me/${phone}?text=${msg}`;
+      waLink.style.display = '';
+    } else {
+      waLink.style.display = 'none';
+    }
+  }
+
+  function openDrivingMode() {
+    drivingActive = true;
+    const overlay = document.getElementById('driving-mode')!;
+    overlay.style.display = 'flex';
+    updateDrivingMode();
+    // Request notification permission on first driving mode use
+    requestNotificationPermission();
+  }
+
+  function closeDrivingMode() {
+    drivingActive = false;
+    document.getElementById('driving-mode')!.style.display = 'none';
+  }
+
+  function setupDrivingMode() {
+    document.getElementById('btn-driving-mode')?.addEventListener('click', openDrivingMode);
+    document.getElementById('dm-close')?.addEventListener('click', closeDrivingMode);
+
+    document.getElementById('dm-complete')?.addEventListener('click', async () => {
+      const stops = await getStops();
+      const next  = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
+      if (!next) return;
+
+      await dbPut(STORES.STOPS, { ...next, status: 'completed', completedAt: Date.now() });
+
+      const remaining = stops.filter(s => s.status !== 'completed').length - 1;
+      await notifyStopCompleted(next.address, remaining);
+
+      const L = (window as any).L;
+      if (L) await renderStopMarkers(L);
+      await updateDrivingMode();
+    });
+  }
+
+  // ── Notification on GPS proximity ─────────────────────────────────────────
+  let _lastNearbyNotif = 0;
+
+  function checkNearbyAlert(stops: Stop[]) {
+    if (!currentPosition) return;
+    const next = stops.find(s => s.status === 'pending' || s.status === 'in_transit');
+    if (!next?.lat || !next?.lng) return;
+
+    const distKm = Math.hypot(next.lat - currentPosition[0], next.lng - currentPosition[1]) * 111;
+    if (distKm <= 0.5 && Date.now() - _lastNearbyNotif > 120_000) {
+      _lastNearbyNotif = Date.now();
+      notifyNearby(next.address, distKm);
+    }
+  }
+
   // ── Init ──
   async function init() {
     await initMap();
     setupListToggle();
+    setupDrivingMode();
 
-    document.getElementById('btn-toggle-route')?.addEventListener('click', toggleRoute);
+    document.getElementById('btn-toggle-route')?.addEventListener('click', async () => {
+      toggleRoute();
+      if (isRouteActive) {
+        const stops = await getStops();
+        const pending = stops.filter(s => s.status !== 'completed').length;
+        if (pending > 0) await notifyRouteStarted(pending);
+      }
+    });
     document.getElementById('btn-optimize')?.addEventListener('click', optimizeRoute);
   }
 
@@ -518,7 +699,31 @@ import MainLayout from '../layouts/MainLayout.astro';
     bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 18rem);
     right: 1.25rem;
     pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
   }
+
+  /* Driving mode secondary FAB */
+  .driving-fab {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(13,17,23,0.9);
+    border: 1px solid var(--border-light);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .driving-fab:hover { color: #00E8A2; border-color: rgba(0,232,162,0.4); }
+  .driving-fab:active { transform: scale(0.9); }
 
   .route-fab {
     width: 60px;

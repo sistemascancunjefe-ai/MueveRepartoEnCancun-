@@ -211,6 +211,116 @@ const jsonLd = JSON.stringify({
     <Toast />
     <PwaReload />
 
+    <!-- ═══ Freemium Gate ═══ -->
+    <div id="freemium-gate" role="dialog" aria-modal="true" aria-label="Plan Freemium"
+         style="display:none;position:fixed;inset:0;z-index:9999;
+                background:rgba(6,10,14,0.97);backdrop-filter:blur(8px);
+                flex-direction:column;align-items:center;justify-content:center;
+                padding:1.5rem;text-align:center;overflow-y:auto;">
+      <div style="max-width:360px;width:100%;padding:1rem 0;">
+        <div style="width:64px;height:64px;border-radius:18px;background:rgba(0,232,162,0.1);
+                    border:1px solid rgba(0,232,162,0.25);display:flex;align-items:center;
+                    justify-content:center;margin:0 auto 1.125rem;">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="#00E8A2" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        </div>
+        <div style="display:inline-block;padding:0.25rem 0.75rem;border-radius:99px;
+                    background:rgba(0,232,162,0.08);border:1px solid rgba(0,232,162,0.2);
+                    font-size:0.625rem;font-weight:800;color:#00E8A2;
+                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:0.875rem;">
+          Versión básica activa
+        </div>
+        <h2 style="font-size:1.375rem;font-weight:900;color:#E2E8F0;margin:0 0 0.5rem;letter-spacing:-0.03em;">
+          Periodo de prueba<br>finalizado
+        </h2>
+        <p style="font-size:0.8125rem;color:#64748B;margin:0 0 1.5rem;line-height:1.6;">
+          Llevas <strong id="freemium-days-used" style="color:#E2E8F0;">0</strong> días usando Mueve Reparto.
+          La versión básica limita a <strong style="color:#FF5A5F;">5 paradas</strong> activas.
+        </p>
+        <div style="background:linear-gradient(135deg,rgba(0,232,162,0.07) 0%,rgba(13,17,23,0.9) 100%);
+                    border:1px solid rgba(0,232,162,0.2);border-radius:14px;padding:1rem;margin-bottom:0.875rem;">
+          <div style="font-size:1.625rem;font-weight:900;color:#00E8A2;margin-bottom:0.25rem;">$99
+            <span style="font-size:0.875rem;font-weight:600;color:#64748B;">MXN/mes</span>
+          </div>
+          <div style="font-size:0.75rem;color:#64748B;margin-bottom:0.75rem;">Mueve Reparto Pro — cancela cuando quieras</div>
+          <ul style="list-style:none;padding:0;margin:0 0 0.875rem;text-align:left;display:flex;flex-direction:column;gap:0.3rem;">
+            <li style="font-size:0.8125rem;color:#94A3B8;display:flex;align-items:center;gap:0.5rem;"><svg width="13" height="13" viewBox="0 0 24 24" fill="#00E8A2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Paradas ilimitadas</li>
+            <li style="font-size:0.8125rem;color:#94A3B8;display:flex;align-items:center;gap:0.5rem;"><svg width="13" height="13" viewBox="0 0 24 24" fill="#00E8A2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Dashboard KPIs avanzado</li>
+            <li style="font-size:0.8125rem;color:#94A3B8;display:flex;align-items:center;gap:0.5rem;"><svg width="13" height="13" viewBox="0 0 24 24" fill="#00E8A2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Registro de gasolina</li>
+            <li style="font-size:0.8125rem;color:#94A3B8;display:flex;align-items:center;gap:0.5rem;"><svg width="13" height="13" viewBox="0 0 24 24" fill="#00E8A2"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Historial completo 90 días</li>
+          </ul>
+          <a href="/suscripcion" id="freemium-cta"
+             style="display:block;width:100%;padding:0.8125rem;
+                    background:linear-gradient(135deg,#00E8A2,#00C48C);
+                    color:#060A0E;font-weight:900;font-size:0.9375rem;
+                    border-radius:10px;text-decoration:none;text-align:center;">
+            Suscribirme ahora
+          </a>
+        </div>
+        <button id="freemium-continue-btn"
+                style="background:transparent;border:1px solid #1E293B;color:#64748B;
+                       font-size:0.8125rem;font-weight:600;padding:0.75rem 1.5rem;
+                       border-radius:10px;cursor:pointer;width:100%;pointer-events:none;opacity:0.4;">
+          Continuar con versión básica
+          <span id="freemium-countdown">&nbsp;(<span id="freemium-secs">8</span>s)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══ Onboarding ═══ (solo primera vez) -->
+    <div id="onboarding-overlay" role="dialog" aria-modal="true" aria-label="Bienvenida a Mueve Reparto"
+         style="display:none;position:fixed;inset:0;z-index:9998;
+                background:rgba(6,10,14,0.96);backdrop-filter:blur(6px);
+                flex-direction:column;align-items:center;justify-content:center;padding:1.5rem;">
+      <div style="max-width:360px;width:100%;">
+        <div id="ob-dots" style="display:flex;gap:0.375rem;justify-content:center;margin-bottom:1.75rem;"></div>
+        <div id="ob-content" style="text-align:center;min-height:200px;"></div>
+        <div style="display:flex;gap:0.625rem;margin-top:1.5rem;">
+          <button id="ob-skip" style="flex:1;padding:0.75rem;background:transparent;border:1px solid #1E293B;
+                                       color:#64748B;font-size:0.8125rem;font-weight:600;border-radius:10px;cursor:pointer;">
+            Saltar
+          </button>
+          <button id="ob-next" style="flex:2;padding:0.75rem;
+                                       background:linear-gradient(135deg,#00E8A2,#00C48C);
+                                       color:#060A0E;font-size:0.9375rem;font-weight:900;
+                                       border-radius:10px;cursor:pointer;border:none;">
+            Siguiente →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PWA Install Banner ═══ -->
+    <div id="pwa-install-banner"
+         style="display:none;position:fixed;
+                bottom:calc(var(--bottom-nav-h, 56px) + env(safe-area-inset-bottom) + 0.75rem);
+                left:0.75rem;right:0.75rem;z-index:500;
+                background:var(--surface-elevated,#161B22);
+                border:1px solid rgba(0,232,162,0.25);border-radius:16px;
+                padding:0.875rem 1rem;box-shadow:0 4px 24px rgba(0,0,0,0.4);">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <img src="/icons/pwa-192x192.png" alt="Mueve Reparto"
+             style="width:42px;height:42px;border-radius:10px;flex-shrink:0;" />
+        <div style="flex:1;min-width:0;">
+          <p style="font-size:0.875rem;font-weight:800;color:#E2E8F0;margin:0 0 0.125rem;">
+            Instala la app
+          </p>
+          <p style="font-size:0.6875rem;color:#64748B;margin:0;">
+            Sin internet · acceso rápido desde inicio
+          </p>
+        </div>
+        <button id="pwa-install-btn"
+                style="padding:0.5rem 0.875rem;background:linear-gradient(135deg,#00E8A2,#00C48C);
+                       color:#060A0E;font-size:0.8125rem;font-weight:900;border:none;
+                       border-radius:8px;cursor:pointer;flex-shrink:0;">
+          Instalar
+        </button>
+        <button id="pwa-install-dismiss"
+                style="padding:0.5rem;background:transparent;border:1px solid #1E293B;
+                       color:#64748B;border-radius:8px;cursor:pointer;line-height:1;flex-shrink:0;"
+                aria-label="Cerrar">✕</button>
+      </div>
+    </div>
+
     <!-- Repartidor name modal -->
     <div id="name-modal-overlay" class="bottom-sheet-overlay" aria-hidden="true">
       <div id="name-modal" class="bottom-sheet" role="dialog" aria-label="Configurar nombre">
@@ -320,22 +430,187 @@ const jsonLd = JSON.stringify({
         if (el) el.classList.replace('flex', 'hidden');
       });
 
-      document.addEventListener('astro:page-load', () => {
-        setupTheme();
-        setupRepartidorName();
-        setupPlanBadge();
+      // ── Freemium Gate ──────────────────────────────────────────────────────
+      function setupFreemiumGate() {
+        const INSTALL_KEY  = 'mr-install-date';
+        const TRIAL_DAYS   = 31;
+        const SKIP_PAGES   = ['/suscripcion', '/auth', '/offline', '/404'];
+
+        // Registrar fecha de instalación
+        if (!localStorage.getItem(INSTALL_KEY)) {
+          localStorage.setItem(INSTALL_KEY, String(Date.now()));
+        }
+
+        const installDate = parseInt(localStorage.getItem(INSTALL_KEY), 10);
+        const daysUsed    = Math.floor((Date.now() - installDate) / 86400000);
+        const isPro       = localStorage.getItem('mr-plan') === 'pro';
+        const path        = window.location.pathname;
+
+        if (isPro || daysUsed <= TRIAL_DAYS || SKIP_PAGES.some(p => path.startsWith(p))) return;
+
+        const gate     = document.getElementById('freemium-gate');
+        const daysEl   = document.getElementById('freemium-days-used');
+        const contBtn  = document.getElementById('freemium-continue-btn');
+        const secsEl   = document.getElementById('freemium-secs');
+        if (!gate) return;
+
+        if (daysEl) daysEl.textContent = String(daysUsed);
+        gate.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // Countdown 8s antes de permitir continuar
+        let secs = 8;
+        const timer = setInterval(() => {
+          secs--;
+          if (secsEl) secsEl.textContent = String(secs);
+          if (secs <= 0) {
+            clearInterval(timer);
+            if (contBtn) {
+              contBtn.style.pointerEvents = 'auto';
+              contBtn.style.opacity       = '1';
+              const countdown = document.getElementById('freemium-countdown');
+              if (countdown) countdown.style.display = 'none';
+            }
+          }
+        }, 1000);
+
+        if (contBtn) {
+          contBtn.addEventListener('click', () => {
+            gate.style.display = 'none';
+            document.body.style.overflow = '';
+          });
+        }
+      }
+
+      // ── Onboarding (4 pasos, solo primera vez) ──────────────────────────────
+      const OB_STEPS = [
+        {
+          icon: '📍',
+          title: 'Agrega tus paradas',
+          body:  'Escribe la dirección, escanea un QR, extrae texto de una foto (OCR) o pega un link de Maps. ¡Listo en segundos!',
+          cta:   'Siguiente →',
+        },
+        {
+          icon: '📷',
+          title: 'OCR: tu herramienta estrella',
+          body:  'Toma foto al pedido de WhatsApp. La app lee la dirección, nombre y teléfono automáticamente. Sin teclear nada.',
+          cta:   'Siguiente →',
+        },
+        {
+          icon: '🗺️',
+          title: 'Optimiza tu ruta',
+          body:  'Ve a "Ruta" y presiona "Optimizar". La app reordena tus paradas del día para que recorras menos kilómetros.',
+          cta:   'Siguiente →',
+        },
+        {
+          icon: '💬',
+          title: 'Notifica a tus clientes',
+          body:  'Con un toque envía mensaje por WhatsApp o Telegram. El cliente sabe que vas llegando. Menos llamadas, más entregas.',
+          cta:   '¡Empezar! 🚚',
+        },
+      ];
+
+      function setupOnboarding() {
+        if (localStorage.getItem('mr-onboarded')) return;
+        // Solo mostrar en /home o primera página
+        if (!['/', '/home'].includes(window.location.pathname)) return;
+
+        const overlay   = document.getElementById('onboarding-overlay');
+        const dotsEl    = document.getElementById('ob-dots');
+        const contentEl = document.getElementById('ob-content');
+        const nextBtn   = document.getElementById('ob-next');
+        const skipBtn   = document.getElementById('ob-skip');
+        if (!overlay || !dotsEl || !contentEl || !nextBtn || !skipBtn) return;
+
+        let step = 0;
+
+        function renderStep(i) {
+          const s = OB_STEPS[i];
+          dotsEl.innerHTML = OB_STEPS.map((_, idx) =>
+            `<div style="width:${idx===i?'20px':'8px'};height:8px;border-radius:99px;
+                         background:${idx===i?'#00E8A2':'#1E293B'};
+                         transition:all 0.3s;"></div>`
+          ).join('');
+          contentEl.innerHTML = `
+            <div style="font-size:3.5rem;margin-bottom:1rem;">${s.icon}</div>
+            <h3 style="font-size:1.25rem;font-weight:900;color:#E2E8F0;margin:0 0 0.75rem;letter-spacing:-0.02em;">${s.title}</h3>
+            <p style="font-size:0.875rem;color:#64748B;line-height:1.65;margin:0;">${s.body}</p>
+          `;
+          nextBtn.textContent = s.cta;
+          skipBtn.style.display = i === OB_STEPS.length - 1 ? 'none' : 'block';
+        }
+
+        function closeOnboarding() {
+          localStorage.setItem('mr-onboarded', '1');
+          overlay.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+
+        renderStep(0);
+        overlay.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        nextBtn.addEventListener('click', () => {
+          step++;
+          if (step >= OB_STEPS.length) { closeOnboarding(); return; }
+          renderStep(step);
+        });
+        skipBtn.addEventListener('click', closeOnboarding);
+      }
+
+      // ── PWA Install Prompt ──────────────────────────────────────────────────
+      let _deferredInstall = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        _deferredInstall = e;
+        // Mostrar banner solo si han pasado ≥2 días y no fue descartado 2+ veces
+        const dismisses = parseInt(localStorage.getItem('mr-install-dismissed') ?? '0', 10);
+        if (dismisses >= 2) return;
+        setTimeout(() => {
+          const banner = document.getElementById('pwa-install-banner');
+          if (banner) banner.style.display = 'block';
+        }, 3000);
       });
 
-      if (document.readyState !== 'loading') {
+      function setupPwaBanner() {
+        const banner      = document.getElementById('pwa-install-banner');
+        const installBtn  = document.getElementById('pwa-install-btn');
+        const dismissBtn  = document.getElementById('pwa-install-dismiss');
+        if (!banner || !installBtn || !dismissBtn) return;
+
+        installBtn.addEventListener('click', async () => {
+          if (!_deferredInstall) return;
+          _deferredInstall.prompt();
+          const result = await _deferredInstall.userChoice;
+          if (result.outcome === 'accepted') {
+            localStorage.setItem('mr-install-dismissed', '99'); // ya instalada
+          }
+          banner.style.display = 'none';
+          _deferredInstall = null;
+        });
+
+        dismissBtn.addEventListener('click', () => {
+          banner.style.display = 'none';
+          const d = parseInt(localStorage.getItem('mr-install-dismissed') ?? '0', 10) + 1;
+          localStorage.setItem('mr-install-dismissed', String(d));
+        });
+      }
+
+      function runAll() {
         setupTheme();
         setupRepartidorName();
         setupPlanBadge();
+        setupFreemiumGate();
+        setupOnboarding();
+        setupPwaBanner();
+      }
+
+      document.addEventListener('astro:page-load', runAll);
+
+      if (document.readyState !== 'loading') {
+        runAll();
       } else {
-        window.addEventListener('DOMContentLoaded', () => {
-          setupTheme();
-          setupRepartidorName();
-          setupPlanBadge();
-        });
+        window.addEventListener('DOMContentLoaded', runAll);
       }
     </script>
   </body>

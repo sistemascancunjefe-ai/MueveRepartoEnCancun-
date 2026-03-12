@@ -49,6 +49,33 @@ self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+// ── Push Notifications ────────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  const data = event.data?.json?.() ?? {};
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Mueve Reparto', {
+      body:     data.body ?? '',
+      icon:     '/icons/pwa-192x192.png',
+      badge:    '/icons/pwa-192x192.png',
+      tag:      data.tag ?? 'mr-push',
+      renotify: true,
+      data:     { url: data.url ?? '/reparto' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? '/reparto';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes(url));
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    })
+  );
+});
+
 // ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;

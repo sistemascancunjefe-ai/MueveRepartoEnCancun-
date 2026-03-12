@@ -913,6 +913,21 @@ import MainLayout from '../layouts/MainLayout.astro';
     const address = getAddressValue();
     if (!address) return;
 
+    // Freemium: máximo 5 paradas activas en versión básica
+    if (!editingId) {
+      const INSTALL_KEY = 'mr-install-date';
+      if (!localStorage.getItem(INSTALL_KEY)) localStorage.setItem(INSTALL_KEY, String(Date.now()));
+      const daysUsed = Math.floor((Date.now() - parseInt(localStorage.getItem(INSTALL_KEY)!, 10)) / 86400000);
+      const isPro    = localStorage.getItem('mr-plan') === 'pro';
+      if (!isPro && daysUsed > 31) {
+        const active = allStops.filter(s => s.status !== 'completed').length;
+        if (active >= 5) {
+          (window as any).showToast?.('Límite de 5 paradas en versión básica — suscríbete a Pro para paradas ilimitadas.', 'warning', 4000);
+          return;
+        }
+      }
+    }
+
     let finalLat: number | undefined;
     let finalLng: number | undefined;
 

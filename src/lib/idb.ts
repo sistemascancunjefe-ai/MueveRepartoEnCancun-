@@ -56,6 +56,15 @@ export interface GeoCache {
   timestamp: number; // Date.now()
 }
 
+export interface FuelLog {
+  id: string;
+  date: number;           // timestamp del llenado
+  liters: number;         // litros cargados
+  pricePerLiter: number;  // precio MXN por litro
+  odometer?: number;      // km del vehículo al cargar (opcional)
+  totalCost: number;      // liters * pricePerLiter (calculado al guardar)
+  note?: string;
+}
 
 export const STORES = {
   STOPS:    'stops',
@@ -63,10 +72,11 @@ export const STORES = {
   TRACKING: 'tracking_points',
   STATS:    'daily_stats',
   GEO:      'geocache',
+  FUEL:     'fuel_logs',
 } as const;
 
 const DB_NAME    = 'mueve-reparto-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let _db: IDBDatabase | null = null;
 
@@ -106,6 +116,12 @@ function openDB(): Promise<IDBDatabase> {
       // Store v2 (solo si oldVersion < 2)
       if (oldVersion < 2 && !db.objectStoreNames.contains(STORES.GEO)) {
         db.createObjectStore(STORES.GEO, { keyPath: 'key' });
+      }
+
+      // Store v3 (fuel logs)
+      if (oldVersion < 3 && !db.objectStoreNames.contains(STORES.FUEL)) {
+        const fuel = db.createObjectStore(STORES.FUEL, { keyPath: 'id' });
+        fuel.createIndex('date', 'date', { unique: false });
       }
     };
 
