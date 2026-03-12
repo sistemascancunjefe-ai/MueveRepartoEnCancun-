@@ -142,6 +142,11 @@ import MainLayout from '../layouts/MainLayout.astro';
     <p style="font-size:0.75rem;color:var(--text-tertiary);margin-top:0.375rem;">
       Pega el enlace compartido — extraeremos las coordenadas automáticamente
     </p>
+    <!-- Live preview de coords detectadas -->
+    <div id="link-coords-preview" style="display:none;margin-top:0.625rem;padding:0.5rem 0.75rem;
+         background:rgba(0,232,162,0.06);border:1px solid rgba(0,232,162,0.2);
+         border-radius:8px;font-size:0.75rem;color:var(--color-primary);font-weight:600;">
+    </div>
   </div>
 
   <!-- QR mode -->
@@ -846,6 +851,8 @@ import MainLayout from '../layouts/MainLayout.astro';
     selectedPriority = 'normal';
     currentCoords = null;
     linkCoords = null;
+    const coordsPreview = document.getElementById('link-coords-preview');
+    if (coordsPreview) { coordsPreview.style.display = 'none'; coordsPreview.textContent = ''; }
     const suggestions = document.getElementById('address-suggestions');
     if (suggestions) suggestions.style.display = 'none';
     const warning = document.getElementById('address-warning');
@@ -930,15 +937,31 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     let finalLat: number | undefined;
     let finalLng: number | undefined;
+    let finalAddress = address; // puede ser reemplazado si extraemos dirección del link
 
     if (currentMode === 'text' && currentCoords) {
       finalLat = currentCoords.lat;
       finalLng = currentCoords.lng;
     } else if (currentMode === 'link') {
-      const extracted = parseCoordsFromMapUrl(address);
+      const extracted = linkCoords ?? parseCoordsFromMapUrl(address);
       if (extracted) {
         finalLat = extracted.lat;
         finalLng = extracted.lng;
+        // Reverse-geocode para obtener dirección legible
+        finalAddress = `Pin (${extracted.lat.toFixed(4)}, ${extracted.lng.toFixed(4)})`;
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${extracted.lat}&lon=${extracted.lng}&format=json&accept-language=es`,
+            { headers: { 'Accept-Language': 'es', 'User-Agent': 'MueveReparto/1.0' } }
+          );
+          if (r.ok) {
+            const data = await r.json();
+            if (data.display_name) {
+              const parts = data.display_name.split(',').slice(0, 3).map((s: string) => s.trim());
+              finalAddress = parts.join(', ');
+            }
+          }
+        } catch { /* usar fallback */ }
       }
     } else if (currentMode === 'qr' && scannedData.lat != null && scannedData.lng != null) {
       finalLat = scannedData.lat;
@@ -952,7 +975,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     const stop: import('../lib/idb').Stop = {
       id:          editingId ?? generateId(),
-      address,
+      address:     finalAddress,
       lat:         finalLat,
       lng:         finalLng,
       priority:    selectedPriority,
@@ -1309,7 +1332,20 @@ import MainLayout from '../layouts/MainLayout.astro';
     });
     document.getElementById('input-lat')?.addEventListener('input', updateSaveBtn);
     document.getElementById('input-lng')?.addEventListener('input', updateSaveBtn);
-    document.getElementById('input-link')?.addEventListener('input', updateSaveBtn);
+    document.getElementById('input-link')?.addEventListener('input', () => {
+      updateSaveBtn();
+      const url     = (document.getElementById('input-link') as HTMLInputElement).value.trim();
+      const preview = document.getElementById('link-coords-preview')!;
+      const coords  = parseCoordsFromMapUrl(url);
+      if (coords) {
+        preview.style.display = 'block';
+        preview.textContent   = `📍 Detectado: ${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+        linkCoords = coords;
+      } else {
+        preview.style.display = 'none';
+        linkCoords = null;
+      }
+    });
 
     // GPS button
     document.getElementById('btn-use-gps')?.addEventListener('click', () => {

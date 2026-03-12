@@ -1,7 +1,7 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
 const proPriceMxn        = import.meta.env.PUBLIC_PRO_PRICE_MXN ?? '99';
-const freeLimit          = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '20';
+const freeLimit          = import.meta.env.PUBLIC_PLAN_FREE_LIMIT ?? '5';
 
 const stripePubKey = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY;
 if (!stripePubKey) {
@@ -56,7 +56,15 @@ if (!stripeBuyButtonId) {
         </li>
         <li>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
-          Exportar rutas y estadísticas
+          Registro de gasolina y rendimiento
+        </li>
+        <li>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          Modo conducción pantalla simplificada
+        </li>
+        <li>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          Notificaciones push de ruta y proximidad
         </li>
         <li>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--color-primary)"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
