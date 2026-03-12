@@ -304,7 +304,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   // ── QR Scanner ──
   let qrStream: MediaStream | null = null;
   let qrAnimFrame: number | null = null;
-  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number } = {};
+  let scannedData: { address?: string; clientName?: string; clientPhone?: string; note?: string; income?: number; lat?: number; lng?: number } = {};
 
   // Cargar jsQR desde el bundle (instalado como dependencia npm)
   async function loadJsQR(): Promise<any> {
@@ -415,6 +415,17 @@ import MainLayout from '../layouts/MainLayout.astro';
     const text = raw.trim();
     const result: typeof scannedData = {};
 
+    // Si el texto es una URL de mapa, extraer coordenadas directamente
+    if (/^https?:\/\//i.test(text)) {
+      const mapCoords = parseCoordsFromMapUrl(text);
+      if (mapCoords) {
+        result.lat = mapCoords.lat;
+        result.lng = mapCoords.lng;
+        result.address = text;  // Guardar URL como referencia
+        return result;
+      }
+    }
+
     // Teléfono mexicano
     const phoneMatch = text.match(/(?:tel[.:]\s*)?(?:\+?52\s*)?(\d{3}[\s-]?\d{3}[\s-]?\d{4}|\d{10})/i);
     if (phoneMatch) result.clientPhone = phoneMatch[1].replace(/[\s-]/g, '');
@@ -458,6 +469,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     const rows = [
       parsed.address    ? `<div>📍 <strong>Dirección:</strong> ${escapeHtml(parsed.address)}</div>` : '',
+      (parsed.lat != null && parsed.lng != null) ? `<div>🗺️ <strong>Coords:</strong> ${parsed.lat.toFixed(5)}, ${parsed.lng.toFixed(5)}</div>` : '',
       parsed.clientName ? `<div>👤 <strong>Cliente:</strong> ${escapeHtml(parsed.clientName)}</div>` : '',
       parsed.clientPhone? `<div>📞 <strong>Tel:</strong> ${escapeHtml(parsed.clientPhone)}</div>` : '',
       parsed.income     ? `<div>💰 <strong>Cobro:</strong> $${escapeHtml(String(parsed.income))}</div>` : '',
@@ -687,90 +699,8 @@ import MainLayout from '../layouts/MainLayout.astro';
         </div>
       </div>`).join('');
 
-    // Bind events on stop cards
+    // Bind click events on stop cards
     listEl.querySelectorAll('.stop-card').forEach(card => {
-      // Drag and Drop
-      card.addEventListener('dragstart', (e: any) => {
-        const target = e.currentTarget as HTMLElement;
-        const index = target.dataset.index;
-        if (index === null || index === undefined) return;
-        e.dataTransfer.setData('text/plain', index);
-        e.dataTransfer.effectAllowed = 'move';
-        target.classList.add('dragging');
-      });
-
-      card.addEventListener('dragend', (e: any) => {
-        const target = e.currentTarget as HTMLElement;
-        target.classList.remove('dragging');
-        // Clear any lingering drag-over states (e.g. cancelled drag)
-        listEl.querySelectorAll('.stop-card.drag-over').forEach((el: Element) => {
-          el.classList.remove('drag-over');
-        });
-      });
-
-      card.addEventListener('dragover', (e: any) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const target = e.currentTarget as HTMLElement;
-        target.classList.add('drag-over');
-      });
-
-      card.addEventListener('dragleave', (e: any) => {
-        const target = e.currentTarget as HTMLElement;
-        target.classList.remove('drag-over');
-      });
-
-      card.addEventListener('drop', async (e: any) => {
-        e.preventDefault();
-        const target = e.currentTarget as HTMLElement;
-        target.classList.remove('drag-over');
-
-        const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-        const dropIndex = parseInt(target.getAttribute('data-index')!, 10);
-
-        if (dragIndex === dropIndex || isNaN(dragIndex) || isNaN(dropIndex)) return;
-
-        // Identificamos el id del elemento donde se soltó ANTES de reordenar
-        const targetId = filtered[dropIndex].id;
-
-        // Reorder logic en filtered
-        // When dragging downward the splice shifts indices, so adjust insertion point.
-        // After the splice filtered.length = N-1; if dropIndex === filtered.length the
-        // drop was on the last card, so skip the -1 adjustment to allow end-of-list placement.
-        const item = filtered.splice(dragIndex, 1)[0];
-        const insertAt = (dragIndex < dropIndex && dropIndex < filtered.length) ? dropIndex - 1 : dropIndex;
-        filtered.splice(insertAt, 0, item);
-
-        // Update orders to match new positions
-        if (currentFilter === 'all') {
-          const promises = filtered.map((stop, idx) => {
-            stop.order = idx;
-            return dbPut(STORES.STOPS, stop);
-          });
-          await Promise.all(promises);
-        } else {
-          // Si estamos filtrando, buscar su índice en allStops
-          const allStopsItemIndex = allStops.findIndex(s => s.id === item.id);
-          const allStopsTargetIndex = allStops.findIndex(s => s.id === targetId);
-
-          if (allStopsItemIndex > -1 && allStopsTargetIndex > -1) {
-            const removedItem = allStops.splice(allStopsItemIndex, 1)[0];
-            // Adjust for direction shift, mirroring the filtered reorder adjustment.
-            // After the splice allStops.length = M-1; if target index equals allStops.length
-            // the drop was on the last item, so skip the -1 to allow end-of-list placement.
-            const allInsertAt = (allStopsItemIndex < allStopsTargetIndex && allStopsTargetIndex < allStops.length) ? allStopsTargetIndex - 1 : allStopsTargetIndex;
-            allStops.splice(allInsertAt, 0, removedItem);
-
-            const promises = allStops.map((stop, idx) => {
-              stop.order = idx;
-              return dbPut(STORES.STOPS, stop);
-            });
-            await Promise.all(promises);
-          }
-        }
-
-        await renderStops();
-      });
       card.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         if (target.closest('.stop-action-btn')) return;
@@ -983,12 +913,36 @@ import MainLayout from '../layouts/MainLayout.astro';
     const address = getAddressValue();
     if (!address) return;
 
+    // Freemium: máximo 5 paradas activas en versión básica
+    if (!editingId) {
+      const INSTALL_KEY = 'mr-install-date';
+      if (!localStorage.getItem(INSTALL_KEY)) localStorage.setItem(INSTALL_KEY, String(Date.now()));
+      const daysUsed = Math.floor((Date.now() - parseInt(localStorage.getItem(INSTALL_KEY)!, 10)) / 86400000);
+      const isPro    = localStorage.getItem('mr-plan') === 'pro';
+      if (!isPro && daysUsed > 31) {
+        const active = allStops.filter(s => s.status !== 'completed').length;
+        if (active >= 5) {
+          (window as any).showToast?.('Límite de 5 paradas en versión básica — suscríbete a Pro para paradas ilimitadas.', 'warning', 4000);
+          return;
+        }
+      }
+    }
+
     let finalLat: number | undefined;
     let finalLng: number | undefined;
 
     if (currentMode === 'text' && currentCoords) {
       finalLat = currentCoords.lat;
       finalLng = currentCoords.lng;
+    } else if (currentMode === 'link') {
+      const extracted = parseCoordsFromMapUrl(address);
+      if (extracted) {
+        finalLat = extracted.lat;
+        finalLng = extracted.lng;
+      }
+    } else if (currentMode === 'qr' && scannedData.lat != null && scannedData.lng != null) {
+      finalLat = scannedData.lat;
+      finalLng = scannedData.lng;
     } else {
       const latStr = (document.getElementById('input-lat') as HTMLInputElement).value;
       const lngStr = (document.getElementById('input-lng') as HTMLInputElement).value;
@@ -1146,6 +1100,81 @@ import MainLayout from '../layouts/MainLayout.astro';
       await worker.terminate();
     }
   }
+
+  function cleanupOcr() {
+    destroyOcrWorker();
+    if (currentPreviewUrl) {
+      URL.revokeObjectURL(currentPreviewUrl);
+      currentPreviewUrl = null;
+    }
+    // Reset OCR tab UI
+    const previewContainer = document.getElementById('ocr-preview-container');
+    const previewImg        = document.getElementById('ocr-preview-img') as HTMLImageElement | null;
+    const btnExtract        = document.getElementById('btn-ocr-extract');
+    const progressContainer = document.getElementById('ocr-progress-container');
+    const resultContainer   = document.getElementById('ocr-result-container');
+    const ocrInput          = document.getElementById('ocr-input-file') as HTMLInputElement | null;
+    if (previewContainer) previewContainer.style.display = 'none';
+    if (previewImg)        { previewImg.src = ''; previewImg.style.display = 'none'; }
+    if (btnExtract)        btnExtract.style.display = 'none';
+    if (progressContainer) progressContainer.style.display = 'none';
+    if (resultContainer)   resultContainer.style.display = 'none';
+    if (ocrInput)          ocrInput.value = '';
+  }
+
+  async function extractOcrText() {
+    const ocrInput          = document.getElementById('ocr-input-file') as HTMLInputElement | null;
+    const progressContainer = document.getElementById('ocr-progress-container')!;
+    const progressBar       = document.getElementById('ocr-progress-bar') as HTMLElement;
+    const progressStatus    = document.getElementById('ocr-progress-status')!;
+    const progressPct       = document.getElementById('ocr-progress-percentage')!;
+    const resultContainer   = document.getElementById('ocr-result-container')!;
+    const textarea          = document.getElementById('ocr-textarea-result') as HTMLTextAreaElement;
+    const btnExtract        = document.getElementById('btn-ocr-extract')!;
+
+    const file = ocrInput?.files?.[0];
+    if (!file) return;
+
+    const runId = ++ocrRunId;
+    btnExtract.setAttribute('disabled', 'true');
+    progressContainer.style.display = 'block';
+    resultContainer.style.display = 'none';
+    progressBar.style.width = '0%';
+    progressStatus.textContent = 'Inicializando...';
+    progressPct.textContent = '0%';
+
+    try {
+      const Tesseract = await loadTesseract();
+      const result = await Tesseract.recognize(file, 'spa', {
+        logger: (m: any) => {
+          if (runId !== ocrRunId) return;
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(m.progress * 100);
+            progressBar.style.width = `${pct}%`;
+            progressStatus.textContent = 'Reconociendo texto...';
+            progressPct.textContent = `${pct}%`;
+          } else if (m.status === 'loading tesseract core') {
+            progressStatus.textContent = 'Cargando motor OCR...';
+          } else if (m.status === 'initializing tesseract') {
+            progressStatus.textContent = 'Iniciando...';
+          } else if (m.status === 'loading language traineddata') {
+            progressStatus.textContent = 'Cargando idioma...';
+          }
+        },
+      });
+      if (runId !== ocrRunId) return;
+      textarea.value = result.data.text.trim();
+      progressContainer.style.display = 'none';
+      resultContainer.style.display = 'block';
+    } catch {
+      if (runId !== ocrRunId) return;
+      progressStatus.textContent = '❌ Error al procesar imagen';
+      progressBar.style.width = '0%';
+    } finally {
+      btnExtract.removeAttribute('disabled');
+    }
+  }
+
   async function geocodePendingStops() {
     if (!navigator.onLine) return;
     const stops = await getStops();

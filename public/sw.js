@@ -1,207 +1,154 @@
-const CACHE_VERSION = 'v3.0.2-ssg';
-const CACHE_NAME = `cancunmueve-${CACHE_VERSION}`;
+const CACHE_VERSION = 'v4.0.0';
+const CACHE_NAME = `mueve-reparto-${CACHE_VERSION}`;
 
-// Critical assets for offline-first PWA
+// Páginas y assets críticos para offline-first
 const CRITICAL_ASSETS = [
   '/',
   '/home',
-  '/rutas',
-  '/mapa',
-  '/wallet',
-  '/community',
-  '/tracking',
-  '/contribuir',
-  '/wasm/route-calculator/route_calculator.js',
-  '/wasm/route-calculator/route_calculator_bg.wasm',
-  '/wasm/spatial-index/spatial_index.js',
-  '/wasm/spatial-index/spatial_index_bg.wasm',
-  '/data/master_routes.json',
-  '/coordinates.json',
+  '/pedidos',
+  '/reparto',
+  '/enviar',
+  '/metricas',
+  '/offline',
   '/manifest.json',
   '/logo.png',
   '/icons/pwa-192x192.png',
   '/icons/pwa-512x512.png',
-  '/icons/bus.svg',
-  '/icons/compass.svg',
-  '/icons/map-pin.svg',
-  '/icons/credit-card.svg',
-  '/icons/alert.svg',
-  '/icons/flag.svg',
-  '/icons/swap.svg',
-  '/icons/home.svg',
-  '/icons/briefcase.svg',
-  '/icons/plane.svg',
-  '/icons/palm-tree.svg',
-  '/icons/loader.svg',
-  '/offline'
 ];
 
-// Regex for OSM tiles (Zoom 11-18)
-const OSM_TILES_PATTERN = /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/(1[1-8])\/.*\.png$/;
-const CARTO_TILES_PATTERN = /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/.*\.png$/;
+// Map tiles: OSM dark + Carto
+const OSM_TILES_PATTERN   = /^https:\/\/[a-c]\.tile\.openstreetmap\.org\//;
+const CARTO_TILES_PATTERN = /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\//;
 
-// Install: Cache critical assets
+// ── Install: pre-cachear assets críticos ─────────────────────────────────────
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing v3.0.0-ssg');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('[SW] Caching critical assets');
-        return cache.addAll(CRITICAL_ASSETS);
+      .then(cache => cache.addAll(CRITICAL_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(err => {
+        console.warn('[SW] Pre-cache parcial:', err);
+        return self.skipWaiting();  // Continuar aunque falle algún asset
       })
-      .then(() => {
-        console.log('[SW] Skip waiting');
-        return self.skipWaiting();
-      })
-      .catch(err => console.error('[SW] Install failed:', err))
   );
 });
 
-// Activate: Clean old caches
+// ── Activate: limpiar caches antiguas ────────────────────────────────────────
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating v3.0.0-ssg');
   event.waitUntil(
     caches.keys()
-      .then(keys => {
-        console.log('[SW] Cleaning old caches:', keys);
-        return Promise.all(
-          keys.filter(key => key !== CACHE_NAME)
-            .map(key => {
-              console.log('[SW] Deleting cache:', key);
-              return caches.delete(key);
-            })
-        );
-      })
-      .then(() => {
-        console.log('[SW] Claiming clients');
-        return self.clients.claim();
-      })
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
-// Message: Handle Skip Waiting
+// ── Message ───────────────────────────────────────────────────────────────────
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    console.log('[SW] Received SKIP_WAITING message');
-    self.skipWaiting();
-  }
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// Fetch: Optimized strategies for SSG + PWA
+// ── Push Notifications ────────────────────────────────────────────────────────
+self.addEventListener('push', (event) => {
+  const data = event.data?.json?.() ?? {};
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Mueve Reparto', {
+      body:     data.body ?? '',
+      icon:     '/icons/pwa-192x192.png',
+      badge:    '/icons/pwa-192x192.png',
+      tag:      data.tag ?? 'mr-push',
+      renotify: true,
+      data:     { url: data.url ?? '/reparto' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url ?? '/reparto';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes(url));
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    })
+  );
+});
+
+// ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
+  if (request.method !== 'GET') return;
+  if (!url.protocol.startsWith('http')) return;
+
+  // API calls y Nominatim → siempre red (no cachear datos de usuario)
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.hostname === 'nominatim.openstreetmap.org'
+  ) return;
+
+  // Stripe → siempre red
+  if (url.hostname.includes('stripe.com')) return;
+
+  // Map tiles → Cache-First (no cambian)
+  if (OSM_TILES_PATTERN.test(request.url) || CARTO_TILES_PATTERN.test(request.url)) {
+    event.respondWith(cacheFirst(request));
     return;
   }
 
-  // Skip chrome-extension and other non-http(s) requests
-  if (!url.protocol.startsWith('http')) {
-    return;
-  }
-
-  // Strategy selection
-  if (url.pathname.includes('/data/')) {
-    // Data files: Stale-While-Revalidate (best for dynamic data)
-    event.respondWith(staleWhileRevalidate(request));
-  } else if (
-    url.pathname.includes('/wasm/') || 
-    url.pathname.includes('/icons/') || 
-    url.pathname.endsWith('coordinates.json') ||
-    url.pathname.endsWith('.wasm') ||
+  // Assets estáticos (JS, CSS, fonts, icons) → Cache-First
+  if (
     url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css')
+    url.pathname.endsWith('.css') ||
+    url.pathname.endsWith('.woff2') ||
+    url.pathname.endsWith('.woff') ||
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/fonts/')
   ) {
-    // Immutable assets: Cache-First
     event.respondWith(cacheFirst(request));
-  } else if (OSM_TILES_PATTERN.test(request.url) || CARTO_TILES_PATTERN.test(request.url)) {
-    // Map tiles: Cache-First (they don't change)
-    event.respondWith(cacheFirst(request));
-  } else if (url.pathname.startsWith('/ruta/') || url.pathname === '/rutas' || url.pathname === '/mapa') {
-    // Static pages (SSG): Cache-First with network fallback
-    event.respondWith(cacheFirst(request));
-  } else {
-    // Default (HTML pages): Network-First with cache fallback
-    event.respondWith(networkFirst(request));
+    return;
   }
+
+  // Páginas HTML → Network-First con fallback offline
+  event.respondWith(networkFirst(request));
 });
 
-// Cache Strategies
+// ── Estrategias de caché ──────────────────────────────────────────────────────
 
-// Cache-First: Best for immutable assets
 async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
   try {
-    const cached = await caches.match(request);
-    if (cached) {
-      return cached;
-    }
-
     const response = await fetch(request);
-    if (response && response.status === 200) {
+    if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
     return response;
-  } catch (error) {
-    const cached = await caches.match(request);
-    if (cached) {
-      return cached;
-    }
-    // Return offline page or placeholder
-    if (request.mode === 'navigate') {
-      const offlineCache = await caches.open(CACHE_NAME);
-      return await offlineCache.match('/offline');
-    }
-
-    return new Response('Offline', { 
-      status: 503, 
-      statusText: 'Service Unavailable',
-      headers: { 'Content-Type': 'text/plain' }
-    });
+  } catch {
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
 }
 
-// Network-First: Best for dynamic content
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response && response.status === 200) {
+    if (response.ok) {
       const cache = await caches.open(CACHE_NAME);
       cache.put(request, response.clone());
     }
     return response;
-  } catch (error) {
+  } catch {
     const cached = await caches.match(request);
-    if (cached) {
-      return cached;
-    }
-    // Return offline fallback
+    if (cached) return cached;
     if (request.mode === 'navigate') {
-        const offlineCache = await caches.open(CACHE_NAME);
-        return await offlineCache.match('/offline');
+      const cache = await caches.open(CACHE_NAME);
+      return (await cache.match('/offline')) ??
+        new Response('<h1>Sin conexión</h1>', { status: 503, headers: { 'Content-Type': 'text/html' } });
     }
-
-    return new Response('Offline', { 
-      status: 503, 
-      statusText: 'Service Unavailable',
-      headers: { 'Content-Type': 'text/plain' }
-    });
+    return new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } });
   }
-}
-
-// Stale-While-Revalidate: Best for data that changes but we want instant response
-async function staleWhileRevalidate(request) {
-  const cached = await caches.match(request);
-  
-  const fetchPromise = fetch(request).then(response => {
-    if (response && response.status === 200) {
-      const cache = caches.open(CACHE_NAME);
-      cache.then(c => c.put(request, response.clone()));
-    }
-    return response;
-  }).catch(() => cached);
-
-  return cached || fetchPromise;
 }
