@@ -13,9 +13,6 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE INDEX IF NOT EXISTS idx_users_phone ON users (phone);
 
--- Vincular devices a users (opcional, permite asociar dispositivos a cuenta)
-ALTER TABLE devices ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE SET NULL;
-CREATE INDEX IF NOT EXISTS idx_devices_user_id ON devices (user_id);
 
 -- Tabla de intentos OTP (para rate-limiting y verificación)
 CREATE TABLE IF NOT EXISTS otp_attempts (

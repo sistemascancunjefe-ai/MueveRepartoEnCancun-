@@ -8,7 +8,7 @@ use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Stop {
     pub id: Uuid,
-    pub device_id: String,
+    pub user_id: String,
     pub client_id: String,
     pub address: String,
     pub lat: Option<f64>,
@@ -55,9 +55,9 @@ pub struct UpdateStop {
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct DailyStats {
     pub id: Uuid,
-    pub device_id: String,
-    pub stat_date: NaiveDate,
-    pub completed: i32,
+    pub user_id: String,
+    pub date: NaiveDate,
+    pub deliveries: i32,
     pub total: i32,
     pub income: f64,
     pub distance_km: Option<f64>,
@@ -66,8 +66,8 @@ pub struct DailyStats {
 
 #[derive(Debug, Deserialize)]
 pub struct UpsertStats {
-    pub stat_date: NaiveDate,
-    pub completed: i32,
+    pub date: NaiveDate,
+    pub deliveries: i32,
     pub total: i32,
     pub income: f64,
     pub distance_km: Option<f64>,
@@ -110,4 +110,9 @@ pub struct AuthResponse {
     pub plan: String,
     pub user_id: String,
     pub email: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub message: String,
 }

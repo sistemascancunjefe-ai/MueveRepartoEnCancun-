@@ -17,7 +17,7 @@ if (!stripeBuyButtonId) {
 <MainLayout title="Mi suscripción">
   <!-- Script Stripe en <head> para que el custom element se defina antes de renderizar -->
   <Fragment slot="head">
-    <script async src="https://js.stripe.com/v3/buy-button.js"></script>
+
   </Fragment>
   <div class="subs-page px-4 pt-4">
 
@@ -74,13 +74,12 @@ if (!stripeBuyButtonId) {
 
       <!-- Stripe Buy Button (visible solo si plan free) -->
       <div id="pro-cta" class="pro-cta">
-        <div id="stripe-btn-wrapper">
-          <stripe-buy-button
-            buy-button-id={stripeBuyButtonId}
-            publishable-key={stripePubKey}
-          ></stripe-buy-button>
+        <div id="conekta-btn-wrapper">
+          <button id="btn-upgrade-card" class="btn-primary" style="width: 100%;">
+            Actualizar a Pro — $99/mes
+          </button>
         </div>
-        <p class="pay-note">Pago seguro con Stripe · Cancela cuando quieras</p>
+        <p class="pay-note">Pago seguro con Conekta · Cancela cuando quieras</p>
       </div>
     </div>
 
@@ -111,8 +110,9 @@ if (!stripeBuyButtonId) {
 
 <script>
   import { getSession, clearSession, isPro as checkPro } from '../lib/session';
+  const API_URL = import.meta.env.PUBLIC_API_URL || '/api';
 
-  function renderPlan() {
+  async function renderPlan() {
     const session  = getSession();
     const email    = session?.email ?? '';
     const userId   = session?.userId ?? null;
@@ -121,17 +121,34 @@ if (!stripeBuyButtonId) {
     const badge          = document.getElementById('plan-badge')!;
     const details        = document.getElementById('plan-details')!;
     const freeInfo       = document.getElementById('free-info')!;
-    const stripeBtnWrap  = document.getElementById('stripe-btn-wrapper')!;
-    const proCta         = document.getElementById('pro-cta')!;
+        const proCta         = document.getElementById('pro-cta')!;
     const accountSection = document.getElementById('account-section')!;
     const accountPhone   = document.getElementById('account-phone')!;
 
-    if (isPro) {
+    // Manejar retorno de Conekta
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success') === '1') {
+      const res = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('mr-auth-token')}` }
+      });
+      if (res.ok) {
+        localStorage.setItem('mr-plan', 'pro');
+      }
+      const badge = document.getElementById('plan-badge')!;
+      badge.textContent = 'Plan Pro ✦';
+      badge.className   = 'plan-badge plan-pro';
+      alert('¡Bienvenido al plan Pro! 🚀');
+    } else if (params.get('error') === '1') {
+      alert('Error en el pago. Por favor intenta de nuevo.');
+    }
+
+    if (isPro || params.get('success') === '1') {
       badge.textContent = 'Plan Pro ✦';
       badge.className   = 'plan-badge plan-pro';
       details.innerHTML = '<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Paradas ilimitadas · Historial 90 días</p>';
-      // Ocultar botón Stripe y mostrar mensaje pro
-      stripeBtnWrap.style.display = 'none';
+
+      const conektaBtnWrap  = document.getElementById('conekta-btn-wrapper');
+      if (conektaBtnWrap) conektaBtnWrap.style.display = 'none';
       proCta.innerHTML = `<p style="font-size:0.875rem;font-weight:700;color:var(--color-primary);text-align:center;padding:0.75rem 0 0;">
         ✅ Ya tienes el plan Pro activo
       </p>`;
@@ -140,7 +157,38 @@ if (!stripeBuyButtonId) {
       badge.textContent = 'Plan Gratuito';
       badge.className   = 'plan-badge plan-free';
       details.innerHTML = `<p style="font-size:0.875rem;color:var(--text-secondary);margin:0.5rem 0 0;">Hasta 20 paradas activas por día</p>`;
-      // El script de Stripe ya se cargó en <head> vía slot — no hacer nada aquí
+
+      const btn = document.getElementById('btn-upgrade-card');
+      if (btn) {
+        btn.addEventListener('click', async () => {
+          const token = localStorage.getItem('mr-auth-token');
+          if (!token) {
+            window.location.href = '/auth?next=/suscripcion';
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = 'Redirigiendo...';
+
+          try {
+            const res = await fetch(`${API_URL}/subscriptions/checkout`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            });
+
+            if (!res.ok) throw new Error('Error al crear checkout');
+            const { checkout_url } = await res.json();
+            window.location.href = checkout_url;
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = 'Actualizar a Pro — $99/mes';
+            alert('Error al procesar pago. Intenta de nuevo.');
+          }
+        });
+      }
     }
 
     // Sección cuenta
