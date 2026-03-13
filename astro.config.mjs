@@ -1,6 +1,6 @@
 import { defineConfig } from 'astro/config'
 import sitemap from '@astrojs/sitemap'
-import tailwind from '@astrojs/tailwind'
+import lit from '@astrojs/lit'
 import node from '@astrojs/node'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -13,7 +13,7 @@ export default defineConfig({
   adapter: node({ mode: 'standalone' }),
   integrations: [
     sitemap(),
-    tailwind({ applyBaseStyles: false }),
+    lit(),
   ],
   vite: {
     resolve: {
