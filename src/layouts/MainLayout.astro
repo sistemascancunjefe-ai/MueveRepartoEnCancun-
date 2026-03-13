@@ -45,6 +45,7 @@ const jsonLd = JSON.stringify({
 <!DOCTYPE html>
 <html lang="es" class="scroll-smooth dark">
   <head>
+    <link rel="stylesheet" href="/src/styles/global.css" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
 
@@ -370,7 +371,7 @@ const jsonLd = JSON.stringify({
           overlay.classList.add('open');
           modal.classList.add('open');
           overlay.setAttribute('aria-hidden', 'false');
-          setTimeout(() => input.focus(), 400);
+          window.setTimeout(function() { input.focus(); }, 400);
         });
 
         overlay.addEventListener('click', (e) => {
@@ -566,7 +567,7 @@ const jsonLd = JSON.stringify({
         // Mostrar banner solo si han pasado ≥2 días y no fue descartado 2+ veces
         const dismisses = parseInt(localStorage.getItem('mr-install-dismissed') ?? '0', 10);
         if (dismisses >= 2) return;
-        setTimeout(() => {
+        window.setTimeout(function() {
           const banner = document.getElementById('pwa-install-banner');
           if (banner) banner.style.display = 'block';
         }, 3000);
