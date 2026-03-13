@@ -126,3 +126,4 @@ corregidos en esta revisión.
        ├─► [Leaflet Map]      ← paradas con coords (P3.3 + reparto.astro)
        └─► [JWT localStorage] ← mr-auth-token, mr-plan (P5)
 ```
+\n- Se ha completado la migración estructural del Frontend: Tailwind y React han sido reemplazados por Lit Web Components nativos y CSS puro en alineación con ADR-2026-001.\n- Librerías pesadas (jsQR, tesseract.js) son cargadas vía CDN perezosamente para mejorar drásticamente el peso inicial de la aplicación.

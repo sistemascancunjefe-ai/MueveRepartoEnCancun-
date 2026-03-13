@@ -313,7 +313,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // Cargar jsQR desde el bundle (instalado como dependencia npm)
   async function loadJsQR(): Promise<any> {
-    const mod = await import('jsqr');
     return mod.default;
   }
 
@@ -339,13 +338,17 @@ import MainLayout from '../layouts/MainLayout.astro';
 
       const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
 
-      function scanFrame() {
+      async function scanFrame() {
         if (video.readyState === video.HAVE_ENOUGH_DATA) {
           canvas.width  = video.videoWidth;
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+
+          await loadScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
+          //@ts-ignore
+          const code = window.jsQR(imageData.data, imageData.width, imageData.height, {
+
             inversionAttempts: 'dontInvert',
           });
 
@@ -356,10 +359,10 @@ import MainLayout from '../layouts/MainLayout.astro';
             return;
           }
         }
-        qrAnimFrame = requestAnimationFrame(scanFrame);
+        qrAnimFrame = requestAnimationFrame(() => scanFrame());
       }
 
-      qrAnimFrame = requestAnimationFrame(scanFrame);
+      qrAnimFrame = requestAnimationFrame(() => scanFrame());
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
         status.textContent = '❌ Permiso de cámara denegado — actívalo en configuración';
@@ -390,7 +393,6 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── OCR Scanner ──
   async function loadTesseract(): Promise<any> {
-    const mod = await import('tesseract.js');
     return mod.default ?? mod;
   }
 
@@ -1120,7 +1122,12 @@ import MainLayout from '../layouts/MainLayout.astro';
     const worker = tesseractWorker;
     if (worker) {
       tesseractWorker = null;
-      await worker.terminate();
+
+        await worker.terminate();
+        if (previewUrl) {
+           URL.revokeObjectURL(previewUrl);
+        }
+
     }
   }
 
@@ -1474,7 +1481,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 
     renderStops();
-    setTimeout(() => geocodePendingStops(), 2000);
+    window.setTimeout(function() { geocodePendingStops(); }, 2000);
   }
 
   document.addEventListener('astro:page-load', init);
