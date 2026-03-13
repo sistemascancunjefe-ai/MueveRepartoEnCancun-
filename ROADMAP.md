@@ -14,8 +14,8 @@
 | P3.2 | QR Scanner (jsQR) + OCR (Tesseract.js) | ✅ Completo |
 | P3.3 | Backend Rust/Axum + PostgreSQL en Render | ✅ Completo |
 | P4 | Autocompletar de direcciones (Nominatim dropdown) | ✅ Completo |
-| P5 | Auth OTP (SMS/Twilio) + JWT + Plan Free/Pro | ✅ Completo |
+| P5 | Auth Magic Link + JWT + Plan Free/Pro | ✅ Completo |
 | P5.2 | Pagos Conekta (Free → Pro upgrade) | 🔴 Pendiente inmediato |
 | P6 | Modo Empresa — múltiples repartidores | 🟡 Planificado |
-| P7 | Integraciones externas (WhatsApp API, CSV import) | 🟢 Backlog |
+| P7 | Mejoras UX + Perfil + Tooltips | ✅ Completo |
 | P8 | Analytics + BI para jefes de reparto | 🟢 Backlog |
