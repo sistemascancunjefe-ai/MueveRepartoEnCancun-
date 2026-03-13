@@ -36,7 +36,7 @@ Los repartidores independientes no tienen herramientas. Las apps empresariales (
 ## Stack técnico
 
 ```
-Frontend:    Astro 5 (SSR) + Vanilla JS + Tailwind CSS v3
+Frontend:    Astro 5 (SSR) + Web Components (Lit) + Pure CSS (diógenes.dev.style)
 Maps:        Leaflet (dark tiles — OpenStreetMap)
 Storage:     IndexedDB (idb 8) — offline-first
 PWA:         Service Worker + Web App Manifest (installable)
@@ -46,7 +46,7 @@ Deploy:      Render (Node.js Web Service)
 Backend:     Rust + Axum + PostgreSQL (Render)
 Auth:        (WIP) OTP SMS + JWT (pendiente de implementar en backend)
 Geocoding:   Nominatim OSM (con caché IDB)
-Scanning:    jsQR (QR) + Tesseract.js (OCR)
+Scanning:    jsQR (QR) + Tesseract.js (OCR) — Lazy Loaded via CDN
 ```
 
 ---
