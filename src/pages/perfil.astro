@@ -1,0 +1,246 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+---
+
+<MainLayout title="Mi Perfil">
+  <div class="perfil-container animate-in">
+    <header class="perfil-header">
+      <div class="avatar-large">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      </div>
+      <h1 id="perfil-name-display" class="perfil-title">Repartidor</h1>
+      <p class="perfil-status">Plan Básico</p>
+    </header>
+
+    <section class="perfil-section">
+      <p class="section-label">Configuración</p>
+      <div class="settings-group">
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Tu nombre</span>
+            <input id="perfil-name-input" type="text" class="input" placeholder="¿Cómo te llamas?" maxlength="24" />
+          </div>
+          <button id="perfil-name-save" class="btn-primary btn-sm">Guardar</button>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-info">
+            <span class="setting-label">Tema Visual</span>
+            <span class="setting-desc">Modo oscuro para ahorrar batería</span>
+          </div>
+          <button class="theme-toggle btn-secondary btn-sm">Cambiar</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="perfil-section">
+      <p class="section-label">Comunidad y Soporte</p>
+      <div class="links-grid">
+        <a href="/nosotros" class="link-card">
+          <div class="link-icon-bg" style="background: rgba(59,130,246,0.1); color: #3B82F6;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div style="flex:1;">
+            <p class="link-title">Sobre Nosotros</p>
+            <p class="link-desc">Nuestra historia y filosofía</p>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+
+        <a href="https://chat.whatsapp.com/FZ3LLEdAaGHGWaA2MIUewh" target="_blank" rel="noopener noreferrer" class="link-card">
+          <div class="link-icon-bg" style="background: rgba(37,211,102,0.1); color: #25D366;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 2c-5.516 0-9.986 4.47-9.986 9.986 0 2.144.673 4.129 1.821 5.766L2.6 22l4.389-1.282c1.541.84 3.303 1.314 5.042 1.314 5.515 0 9.985-4.47 9.985-9.986 0-5.516-4.47-9.986-9.985-9.986zm5.023 14.331c-.208.583-1.234 1.133-1.698 1.18-.444.047-.732.146-2.533-.604-2.193-.911-3.606-3.14-3.716-3.287-.11-.148-.895-1.189-.895-2.278 0-1.089.567-1.624.77-1.847.203-.222.443-.278.59-.278.148 0 .296.002.425.008.134.006.313-.051.49.378.18.435.617 1.503.67 1.613.053.11.088.239.015.386-.073.147-.11.239-.22.368-.11.129-.232.287-.33.385-.11.11-.225.23-.097.449.128.219.57.941 1.223 1.52.84.746 1.549.977 1.768 1.086.219.11.348.093.477-.055.129-.148.553-.645.701-.865.148-.22.296-.185.498-.11.203.075 1.291.61 1.513.72.222.11.37.166.425.26.055.094.055.546-.153 1.129z"/></svg>
+          </div>
+          <div style="flex:1;">
+            <p class="link-title">Comunidad WhatsApp</p>
+            <p class="link-desc">Únete a otros repartidores</p>
+          </div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <div class="version-tag">
+      Mueve Reparto v3.2.0-beta
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  function initPerfil() {
+    const nameInput = document.getElementById('perfil-name-input') as HTMLInputElement;
+    const nameSave  = document.getElementById('perfil-name-save');
+    const display   = document.getElementById('perfil-name-display');
+
+    const currentName = localStorage.getItem('mr-repartidor-name') || 'Repartidor';
+    if (nameInput) nameInput.value = currentName === 'Repartidor' ? '' : currentName;
+    if (display) display.textContent = currentName;
+
+    nameSave?.addEventListener('click', () => {
+      const val = nameInput.value.trim();
+      if (val) {
+        localStorage.setItem('mr-repartidor-name', val);
+        if (display) display.textContent = val;
+        // Update header if exists
+        const headerName = document.getElementById('repartidor-name');
+        if (headerName) headerName.textContent = val;
+
+        // Visual feedback
+        nameSave.textContent = '¡Guardado!';
+        nameSave.classList.replace('btn-primary', 'btn-success');
+        setTimeout(() => {
+          nameSave.textContent = 'Guardar';
+          nameSave.classList.replace('btn-success', 'btn-primary');
+        }, 2000);
+      }
+    });
+  }
+
+  document.addEventListener('astro:page-load', initPerfil);
+  if (document.readyState !== 'loading') initPerfil();
+</script>
+
+<style>
+  .perfil-container {
+    padding: 1.5rem 1rem;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .perfil-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--surface-elevated);
+    border: 2px solid var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary);
+    margin-bottom: 1rem;
+    box-shadow: 0 8px 24px rgba(0, 232, 162, 0.15);
+  }
+
+  .perfil-title {
+    font-size: 1.75rem;
+    font-weight: 900;
+    margin: 0;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+  }
+
+  .perfil-status {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-top: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .perfil-section {
+    margin-bottom: 2rem;
+  }
+
+  .settings-group {
+    background: var(--surface-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+  }
+
+  .setting-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .setting-item:last-child { border-bottom: none; }
+
+  .setting-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .setting-label {
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .setting-desc {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+  }
+
+  .links-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .link-card {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--surface-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+  }
+
+  .link-card:active { transform: scale(0.98); }
+
+  .link-icon-bg {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .link-title {
+    font-weight: 700;
+    font-size: 0.9375rem;
+    margin: 0;
+  }
+
+  .link-desc {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    margin: 0;
+  }
+
+  .version-tag {
+    text-align: center;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: var(--text-tertiary);
+    margin-top: 3rem;
+    opacity: 0.5;
+  }
+
+  .btn-success {
+    background: #10B981;
+    color: #fff;
+    border: none;
+  }
+</style>
