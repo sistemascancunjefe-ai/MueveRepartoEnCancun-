@@ -59,6 +59,12 @@ services:
       # Crear en: https://resend.com/api-keys
       - key: RESEND_API_KEY
         sync: false
+      - key: CONEKTA_PRIVATE_KEY
+        sync: false
+      - key: CONEKTA_WEBHOOK_SECRET
+        sync: false
+      - key: PUBLIC_URL
+        value: https://mueverepartoencancun.onrender.com
     autoDeploy: true
 
 databases:

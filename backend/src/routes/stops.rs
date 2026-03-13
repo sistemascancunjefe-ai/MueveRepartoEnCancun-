@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use std::env;
 use uuid::Uuid;
 
-use crate::{middleware::{auth::MaybeAuthUser, device::DeviceId}, models::*};
+use crate::{middleware::{auth::AuthUser, device::DeviceId}, models::*};
 
 /// GET /stops — Lista paradas del dispositivo ordenadas por stop_order
 pub async fn list_stops(
@@ -34,7 +34,7 @@ pub async fn list_stops(
 /// POST /stops — Crear parada nueva
 pub async fn create_stop(
     DeviceId(device_id): DeviceId,
-    MaybeAuthUser(auth): MaybeAuthUser,
+    auth: Option<AuthUser>,
     State(pool): State<PgPool>,
     Json(body): Json<CreateStop>,
 ) -> Result<(StatusCode, Json<Stop>), StatusCode> {
@@ -200,8 +200,8 @@ pub async fn sync_stops(
                 "#,
             )
             .bind(&device_id)
-            .bind(st.stat_date)
-            .bind(st.completed)
+            .bind(st.date)
+            .bind(st.deliveries)
             .bind(st.total)
             .bind(st.income)
             .bind(st.distance_km)
@@ -211,7 +211,7 @@ pub async fn sync_stops(
 
             match res {
                 Ok(_) => synced_stats += 1,
-                Err(e) => errors.push(format!("stats {}: {e}", st.stat_date)),
+                Err(e) => errors.push(format!("stats {}: {e}", st.date)),
             }
         }
     }

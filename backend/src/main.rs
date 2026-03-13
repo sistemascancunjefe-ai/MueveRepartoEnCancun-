@@ -79,7 +79,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/stops/:id",       delete(routes::stops::delete_stop))
         // ── Stats ──
         .route("/stats",           get(routes::stats::get_stats))
-        .route("/stats",           post(routes::stats::upsert_stats))
+        .route("/stats",           post(routes::stats::get_stats))
+        // ── Subscriptions ──
+        .route("/subscriptions/checkout", post(routes::subscriptions::checkout))
+        .route("/subscriptions/webhook",  post(routes::subscriptions::webhook))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

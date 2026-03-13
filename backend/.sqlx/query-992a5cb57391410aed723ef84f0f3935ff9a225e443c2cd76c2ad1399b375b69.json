@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO subscriptions (user_id, plan, status, provider, provider_ref, amount_mxn)\n                     VALUES ($1, 'pro', 'active', 'conekta', $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "992a5cb57391410aed723ef84f0f3935ff9a225e443c2cd76c2ad1399b375b69"
+}

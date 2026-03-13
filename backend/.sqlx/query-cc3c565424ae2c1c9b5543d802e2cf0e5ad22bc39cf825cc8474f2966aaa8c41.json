@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM magic_tokens WHERE email = $1 AND expires_at < NOW()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc3c565424ae2c1c9b5543d802e2cf0e5ad22bc39cf825cc8474f2966aaa8c41"
+}
