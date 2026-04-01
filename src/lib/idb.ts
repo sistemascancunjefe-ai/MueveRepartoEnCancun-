@@ -258,6 +258,7 @@ export function generateId(): string {
 
 // ── Geocoding ──
 let _lastNominatimCall = 0;
+let _geocodeQueue: Promise<unknown> = Promise.resolve();
 
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const key = address.trim().toLowerCase();
@@ -273,14 +274,27 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
     // Caché expirada, continuar
   }
 
-  // 2. Rate limit: esperar si la última llamada fue hace < 1 segundo
-  const elapsed = Date.now() - _lastNominatimCall;
-  if (elapsed < 1000) {
-    await new Promise(r => setTimeout(r, 1000 - elapsed));
-  }
-  _lastNominatimCall = Date.now();
+  // 2. Queue & Rate limit: encadenar promesas para asegurar 1req/s incluso con llamadas concurrentes
+  return new Promise((resolve) => {
+    _geocodeQueue = _geocodeQueue
+      .then(async () => {
+        const elapsed = Date.now() - _lastNominatimCall;
+        if (elapsed < 1000) {
+          await new Promise(r => setTimeout(r, 1000 - elapsed));
+        }
+        _lastNominatimCall = Date.now();
 
-  // 3. Llamar a Nominatim
+        const result = await _performGeocode(address, key);
+        resolve(result);
+      })
+      .catch((err) => {
+        console.error('Geocoding queue error:', err);
+        resolve(null);
+      });
+  });
+}
+
+async function _performGeocode(address: string, key: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   try {
     const q = encodeURIComponent(`${address}, Cancún, Quintana Roo, México`);
     const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=mx`;
