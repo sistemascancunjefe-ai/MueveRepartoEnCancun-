@@ -113,6 +113,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   import type { Stop } from '../lib/idb';
   import { optimizeRoute as runOptimization } from '../utils/routes';
   import { notifyRouteStarted, notifyStopCompleted, notifyNearby, requestNotificationPermission } from '../lib/notifications';
+  import { escapeHtml } from '../utils/utils';
 
   let map: any;
   let isRouteActive = false;
@@ -153,7 +154,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       if (s.lat && s.lng) {
         const icon = L.divIcon({
           className: 'custom-marker',
-          html: `<div class="marker-pin ${s.priority === 'urgent' ? 'urgent' : ''}">${s.order + 1}</div>`,
+          html: `<div class="marker-pin ${s.priority === 'urgent' ? 'urgent' : ''}">${escapeHtml(s.order + 1)}</div>`,
           iconSize: [30, 30],
           iconAnchor: [15, 30]
         });
@@ -181,10 +182,10 @@ import MainLayout from '../layouts/MainLayout.astro';
       nextPanel.style.display = 'block';
       nextContent.innerHTML = `
         <div style="display:flex;gap:0.75rem;">
-          <div class="stop-number ${next.priority === 'urgent' ? 'urgent' : ''}">${next.order + 1}</div>
+          <div class="stop-number ${next.priority === 'urgent' ? 'urgent' : ''}">${escapeHtml(next.order + 1)}</div>
           <div style="flex:1;">
-            <p style="font-weight:700;margin:0;">${next.address}</p>
-            <p style="font-size:0.75rem;color:var(--text-tertiary);margin:2px 0 0;">${next.clientName || 'Sin nombre'}</p>
+            <p style="font-weight:700;margin:0;">${escapeHtml(next.address)}</p>
+            <p style="font-size:0.75rem;color:var(--text-tertiary);margin:2px 0 0;">${escapeHtml(next.clientName || 'Sin nombre')}</p>
           </div>
         </div>`;
     } else {
@@ -193,10 +194,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 
     // Update List
     listEl.innerHTML = stops.map(s => `
-      <div class="route-stop-row ${s.status === 'completed' ? 'done' : ''}" data-id="${s.id}">
-        <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}" style="width:24px;height:24px;font-size:0.625rem;">${s.order + 1}</div>
+      <div class="route-stop-row ${s.status === 'completed' ? 'done' : ''}" data-id="${escapeHtml(s.id)}">
+        <div class="stop-number ${s.priority === 'urgent' ? 'urgent' : ''}" style="width:24px;height:24px;font-size:0.625rem;">${escapeHtml(s.order + 1)}</div>
         <div style="flex:1;min-width:0;">
-          <p style="font-size:0.875rem;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.address}</p>
+          <p style="font-size:0.875rem;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(s.address)}</p>
         </div>
         ${s.status === 'completed' ? '<span class="badge badge-success">Listo</span>' : ''}
         <div class="swipe-hint"></div>
