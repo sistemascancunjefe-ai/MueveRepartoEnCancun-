@@ -121,7 +121,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
   // ── Map Init ──
   async function initMap() {
-    const L = (window as any).L;
+    const L = window.L;
     if (!L) return;
 
     map = L.map('map', {
@@ -138,7 +138,7 @@ import MainLayout from '../layouts/MainLayout.astro';
   }
 
   async function renderStops() {
-    const L = (window as any).L;
+    const L = window.L;
     const stops = await getStops();
 
     // Clear old markers
@@ -216,9 +216,9 @@ import MainLayout from '../layouts/MainLayout.astro';
         document.getElementById('gps-status-dot')!.className = 'gps-dot active';
         document.getElementById('gps-status-text')!.textContent = 'GPS: Activo';
 
-        const L = (window as any).L;
-        if (!window['userMarker']) {
-          window['userMarker'] = L.circleMarker([lat, lng], {
+        const L = window.L;
+        if (!window.userMarker) {
+          window.userMarker = L.circleMarker([lat, lng], {
             radius: 8,
             fillColor: '#00E8A2',
             color: '#fff',
@@ -226,7 +226,7 @@ import MainLayout from '../layouts/MainLayout.astro';
             fillOpacity: 1
           }).addTo(map);
         } else {
-          window['userMarker'].setLatLng([lat, lng]);
+          window.userMarker.setLatLng([lat, lng]);
         }
 
         checkProximity();
