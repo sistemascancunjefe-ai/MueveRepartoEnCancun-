@@ -72,8 +72,8 @@
 <script>
     // Service Worker Logic
     // Robust for View Transitions and Idempotency
-    if ('serviceWorker' in navigator && !(window as any).pwa_initialized) {
-        (window as any).pwa_initialized = true;
+    if ('serviceWorker' in navigator && !window.pwa_initialized) {
+        window.pwa_initialized = true;
 
         const showToast = () => {
             const toast = document.getElementById('pwa-toast');

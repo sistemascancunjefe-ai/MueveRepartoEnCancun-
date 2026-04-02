@@ -931,7 +931,7 @@ import MainLayout from '../layouts/MainLayout.astro';
       if (!isPro && daysUsed > 31) {
         const active = allStops.filter(s => s.status !== 'completed').length;
         if (active >= 5) {
-          (window as any).showToast?.('Límite de 5 paradas en versión básica — suscríbete a Pro para paradas ilimitadas.', 'warning', 4000);
+          window.showToast?.('Límite de 5 paradas en versión básica — suscríbete a Pro para paradas ilimitadas.', 'warning', 4000);
           return;
         }
       }
