@@ -258,6 +258,7 @@ export function generateId(): string {
 
 // ── Geocoding ──
 let _lastNominatimCall = 0;
+let _nominatimQueue: Promise<any> = Promise.resolve();
 
 export async function geocodeAddress(address: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const key = address.trim().toLowerCase();
@@ -273,13 +274,25 @@ export async function geocodeAddress(address: string): Promise<{ lat: number; ln
     // Caché expirada, continuar
   }
 
-  // 2. Rate limit: esperar si la última llamada fue hace < 1 segundo
-  const elapsed = Date.now() - _lastNominatimCall;
-  if (elapsed < 1000) {
-    await new Promise(r => setTimeout(r, 1000 - elapsed));
-  }
-  _lastNominatimCall = Date.now();
+  // 2. Queue & Rate limit: asegurar 1 req/s incluso si se llama concurrentemente
+  return new Promise((resolve) => {
+    _nominatimQueue = _nominatimQueue
+      .catch(() => {}) // Prevenir que fallos previos bloqueen la cola
+      .then(async () => {
+        const now = Date.now();
+        const elapsed = now - _lastNominatimCall;
+        if (elapsed < 1000) {
+          await new Promise(r => setTimeout(r, 1000 - elapsed));
+        }
+        _lastNominatimCall = Date.now(); // Actualizar antes de la llamada para max(1s, respuesta)
 
+        const result = await _performGeocode(address, key);
+        resolve(result);
+      });
+  });
+}
+
+async function _performGeocode(address: string, key: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   // 3. Llamar a Nominatim
   try {
     const q = encodeURIComponent(`${address}, Cancún, Quintana Roo, México`);
