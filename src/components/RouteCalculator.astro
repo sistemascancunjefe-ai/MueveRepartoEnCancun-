@@ -355,9 +355,7 @@ const ui = uiTranslations[currentLang];
 
           // ⚡ Speedy Gonzalez: Smart Normalization
           // Only normalize if using un-optimized fallback data.
-          if (jsonData.metadata?.optimized) {
-              console.log("⚡ [RouteCalculator] Using pre-optimized JSON (Skipped Runtime Normalization)");
-          } else {
+          if (!jsonData.metadata?.optimized) {
               console.warn("⚠️ [RouteCalculator] Data not optimized. Running runtime normalization (Slow).");
               const normalized = { ...jsonData };
 
