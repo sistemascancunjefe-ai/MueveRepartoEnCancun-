@@ -297,7 +297,7 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 <script>
   import { escapeHtml } from '../utils/utils';
-  import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress } from '../lib/idb';
+  import { dbPut, dbDelete, dbGetAll, getStops, completeStop, generateId, STORES, geocodeAddress, dbPutMany } from '../lib/idb';
   import type { Stop } from '../lib/idb';
   import { isPro } from '../lib/session';
 
@@ -1209,13 +1209,21 @@ import MainLayout from '../layouts/MainLayout.astro';
     if (!navigator.onLine) return;
     const stops = await getStops();
     const pending = stops.filter(s => !s.lat && !s.lng && s.status !== 'completed');
-    for (const stop of pending) {
+
+    if (pending.length === 0) return;
+
+    const results = await Promise.all(pending.map(async (stop) => {
       const coords = await geocodeAddress(stop.address);
       if (coords) {
-        await dbPut(STORES.STOPS, { ...stop, lat: coords.lat, lng: coords.lng });
+        return { ...stop, lat: coords.lat, lng: coords.lng };
       }
-    }
-    if (pending.length > 0) {
+      return null;
+    }));
+
+    const updates = results.filter((s): s is import('../lib/idb').Stop => s !== null);
+
+    if (updates.length > 0) {
+      await dbPutMany(STORES.STOPS, updates);
       await renderStops();
     }
   }
