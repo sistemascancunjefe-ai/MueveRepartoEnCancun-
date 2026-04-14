@@ -54,7 +54,6 @@ export class CoordinatesStore {
                 let text = "";
 
                 if (data) {
-                    console.log("[CoordinatesStore] ⚡ Using injected data (Skipped Fetch)");
                     text = JSON.stringify(data);
                 } else {
                     console.log("[CoordinatesStore] 🌍 Fetching master routes for coordinates...");
