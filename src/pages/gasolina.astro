@@ -300,7 +300,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     const liters = parseFloat((document.getElementById('fuel-liters') as HTMLInputElement).value);
     const price  = parseFloat((document.getElementById('fuel-price') as HTMLInputElement).value);
     if (!liters || !price) {
-      (window as any).showToast?.('Completa litros y precio.', 'warning');
+      window.showToast?.('Completa litros y precio.', 'warning');
       return;
     }
     const odometerStr = (document.getElementById('fuel-odometer') as HTMLInputElement).value;
@@ -316,7 +316,7 @@ import MainLayout from '../layouts/MainLayout.astro';
     await dbPut(STORES.FUEL, log);
     closeSheet();
     await loadAndRender();
-    (window as any).showToast?.('Llenado registrado ✅', 'success');
+    window.showToast?.('Llenado registrado ✅', 'success');
   }
 
   // ── Init ──
