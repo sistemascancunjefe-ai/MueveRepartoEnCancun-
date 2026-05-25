@@ -5,7 +5,7 @@ services:
     runtime: node
     repo: https://github.com/sistemascancunjefe-ai/MueveRepartoEnCancun-
     branch: main
-    buildCommand: pnpm install --frozen-lockfile && pnpm run build
+    buildCommand: ./scripts/setup-render.sh
     startCommand: node ./dist/server/entry.mjs
     envVars:
       - key: NODE_VERSION
